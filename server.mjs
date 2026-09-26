@@ -369,8 +369,11 @@ export function createApp({ db = openStore(resolve(process.env.DATA_DIR || 'data
   server.on('close',()=>sheets.close());
   return { server, db, handle, sheets }; 
 }
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+const isDirectRun = process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
+if (isDirectRun || process.env.VERCEL) {
   if (process.env.NODE_ENV === 'production' && !process.env.APP_ORIGIN?.startsWith('https://')) throw new Error('운영 환경에서는 HTTPS APP_ORIGIN이 필요합니다.');
   const { server } = createApp();
-  server.listen(Number(process.env.PORT || 5500), process.env.HOST || '127.0.0.1', () => console.log(`かな소리: http://${process.env.HOST || '127.0.0.1'}:${process.env.PORT || 5500}`));
+  const port = Number(process.env.PORT || 5500);
+  const host = process.env.VERCEL ? '0.0.0.0' : (process.env.HOST || '127.0.0.1');
+  server.listen(port, host, () => console.log(`かな소리: http://${host}:${port}`));
 }

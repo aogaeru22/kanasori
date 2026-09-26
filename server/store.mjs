@@ -15,7 +15,8 @@ export function verifyPassword(password, hash) {
   return timingSafeEqual(scryptSync(password, salt, 32), Buffer.from(expected, 'hex'));
 }
 export function openStore(path) {
-  if (path !== ':memory:' && process.env.DATABASE_URL) return openPostgres(process.env.DATABASE_URL);
+  const databaseUrl = process.env.DATABASE_URL?.trim();
+  if (path !== ':memory:' && databaseUrl) return openPostgres(databaseUrl);
   if (path !== ':memory:') mkdirSync(dirname(path), { recursive: true });
   const db = new DatabaseSync(path);
   db.exec(`PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;
