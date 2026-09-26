@@ -373,18 +373,20 @@ export function createApp({ db = openStore(resolve(process.env.DATA_DIR || 'data
   return { server, db, handle, sheets }; 
 }
 const isDirectRun = process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
-if (isDirectRun || process.env.VERCEL) {
-  const port = Number(process.env.PORT || 5500);
-  const host = process.env.VERCEL ? '0.0.0.0' : (process.env.HOST || '127.0.0.1');
+const portFromPlatform = process.env.PORT;
+if ((isDirectRun || portFromPlatform) && !process.env.NODE_TEST_CONTEXT) {
+  const port = Number(portFromPlatform || 5500);
+  const host = portFromPlatform ? '0.0.0.0' : (process.env.HOST || '127.0.0.1');
+  let server;
   try {
-    if (process.env.NODE_ENV === 'production' && !process.env.APP_ORIGIN?.startsWith('https://')) throw new Error('운영 환경에서는 HTTPS APP_ORIGIN이 필요합니다.');
-    const { server } = createApp();
-    server.listen(port, host, () => console.log(`かな소리: http://${host}:${port}`));
+    if (portFromPlatform && process.env.NODE_ENV === 'production' && !process.env.APP_ORIGIN?.startsWith('https://')) throw new Error('운영 환경에서는 HTTPS APP_ORIGIN이 필요합니다.');
+    server = createApp().server;
   } catch (error) {
     console.error(error);
-    createServer((req, res) => {
+    server = createServer((req, res) => {
       res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
       res.end('앱을 시작하지 못했습니다. 연결 주소를 확인하세요.');
-    }).listen(port, host);
+    });
   }
+  server.listen(port, host, () => console.log(`かな소리: http://${host}:${port}`));
 }
