@@ -374,7 +374,7 @@ export function createApp({ db = openStore(resolve(process.env.DATA_DIR || 'data
 }
 const isDirectRun = process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 const portFromPlatform = process.env.PORT;
-if ((isDirectRun || portFromPlatform) && !process.env.NODE_TEST_CONTEXT) {
+if ((isDirectRun || process.env.VERCEL) && !process.env.NODE_TEST_CONTEXT && !process.env.KANASORI_BOOT) {
   const port = Number(portFromPlatform || 5500);
   const host = portFromPlatform ? '0.0.0.0' : (process.env.HOST || '127.0.0.1');
   let server;

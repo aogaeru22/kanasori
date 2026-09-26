@@ -2,7 +2,7 @@
   "name": "tobiishi",
   "private": true,
   "type": "module",
-  "main": "server.mjs",
+  "main": "server.js",
   "scripts": {
     "start": "node --env-file-if-exists=.env server.mjs",
     "preview": "node server/preview.mjs",
