@@ -13,10 +13,15 @@ let appPromise;
 function loadApp() {
   if (!appPromise) {
     const specifier = './' + 'classroom-server.mjs';
-    appPromise = import(specifier).then(mod => mod.createApp({
-      origin: process.env.APP_ORIGIN,
-      secure: process.env.NODE_ENV === 'production' || Boolean(process.env.VERCEL),
-    })).catch(error => {
+    appPromise = import(specifier).then(async mod => {
+      const app = mod.createApp({
+        origin: process.env.APP_ORIGIN,
+        secure: process.env.NODE_ENV === 'production' || Boolean(process.env.VERCEL),
+      });
+      if (app.db.ready) await app.db.ready;
+      if (app.db.readyError) appPromise = null;
+      return app;
+    }).catch(error => {
       appPromise = null;
       throw error;
     });
