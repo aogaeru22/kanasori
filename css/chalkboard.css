@@ -1,0 +1,160 @@
+@import url('https://fonts.googleapis.com/css2?family=Gaegu:wght@400;700&display=swap');
+
+/* Shared classroom theme. Learning glyphs keep their Japanese textbook font. */
+:root {
+  --chalk:#F5F5DC; --yellow:#FFD700; --red:#FF6B6B;
+  --board:#2D4A2D; --board-dark:#233e29;
+  --ink:var(--chalk); --ink-soft:#d8dfc9; --paper:var(--chalk);
+  --deep:var(--board); --card:var(--board-dark); --lime:var(--yellow);
+  --muted:#c8d3bc; --line:#f5f5dc40; --danger:var(--red);
+  --pass:#d5eaa9; --blue:var(--yellow); --indigo:var(--chalk);
+  --persimmon:var(--red); --shadow:0 12px 26px #14241930;
+  color:var(--chalk); background:var(--board); color-scheme:dark;
+}
+html { min-height:100%; background:var(--board); }
+body,body.writing {
+  min-height:100vh; color:var(--chalk); background-color:var(--board);
+  background-image:radial-gradient(ellipse at 18% 28%,#f5f5dc0a,transparent 48%),
+    radial-gradient(ellipse at 82% 65%,#f5f5dc09,transparent 45%),
+    repeating-linear-gradient(174deg,transparent 0 91px,#f5f5dc03 94px,transparent 99px);
+  border-top:7px solid #866345;
+}
+body::before {
+  content:''; position:fixed; inset:0; pointer-events:none; z-index:20; opacity:.075;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.65' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Cpath fill='%23fff' filter='url(%23n)' opacity='.7' d='M0 0h220v220H0z'/%3E%3C/svg%3E");
+}
+body::after { content:''; display:block; height:10px; margin-top:36px; background:linear-gradient(#a08057,#745439); box-shadow:0 -3px 7px #14241940; }
+header,.topbar,.attendance-page header,.learning-nav {
+  background:transparent; color:var(--chalk); border-bottom:1px dashed var(--line);
+  padding-top:22px; padding-bottom:18px;
+}
+a,.brand,.learning-nav a { color:var(--chalk); }
+.brand small,.brand-kana,.intro .eyebrow,.section-label,.eyebrow { color:var(--yellow); }
+.brand { letter-spacing:.02em; }
+body h1,body h2,body h3,.surface h2,.intro h1,.dialog-heading h2,
+.attendance-surface .board-heading h2 {
+  font-family:KanaKyotai,'Gaegu',cursive; font-weight:700; color:var(--chalk);
+  text-shadow:.5px .3px #f5f5dc66; letter-spacing:-.025em;
+}
+body h1 { line-height:1.22; }
+.intro h1 { font-size:clamp(46px,5.5vw,76px); }
+.intro h1 span { color:var(--yellow); position:relative; display:inline-block; }
+.intro h1 span::after { content:''; position:absolute; left:0; right:0; bottom:-6px; height:5px; border-bottom:3px solid var(--yellow); border-radius:45%; transform:rotate(-2deg); opacity:.8; }
+.intro p,.intro-bottom,.muted,.small,.micro,.note,.message,footer { color:var(--muted); }
+.wordmark,.brand { font-family:KanaKyotai,'Gaegu',cursive; font-weight:700; color:var(--chalk); }
+.wordmark span { color:var(--yellow); }
+.intro-bottom { border-color:var(--line); }
+.surface,.card,.panel,.teacher-auth,dialog,.speaking-card,.score-result,.heard-box {
+  background:#233e29e8; color:var(--chalk); border:1px solid #f5f5dc70;
+  border-radius:8px 13px 7px 11px; box-shadow:inset 0 0 0 3px #f5f5dc06,0 12px 28px #10241622;
+}
+.surface { border-width:2px; padding:32px; }
+.surface>div>.section-label::before { content:'✦ '; color:var(--yellow); }
+.surface h2 { font-size:38px; }
+.surface .muted { color:var(--muted); }
+input,select,textarea,.manual-section input,.manual-section select,.roster-settings textarea {
+  background:#1f3827; color:var(--chalk); border:1px solid #f5f5dc70;
+  border-radius:5px 8px 5px 7px; accent-color:var(--yellow);
+}
+input::placeholder,textarea::placeholder { color:#c8d3bc; opacity:.8; }
+select option { background:var(--board-dark); color:var(--chalk); }
+button,.button,.quiet,.small-button,.mark-present,.material-links a,.practice-navigation a,.retry {
+  color:var(--chalk); background:#f5f5dc08; border:1px solid #f5f5dc70;
+  border-radius:6px 9px 5px 8px; box-shadow:none;
+}
+button:hover,.button:hover,.quiet:hover,.small-button:hover,.material-links a:hover,.practice-navigation a:hover { background:#f5f5dc18; border-color:var(--yellow); }
+.primary,button.primary { background:var(--yellow); color:#233e29; border:2px solid var(--yellow); font-weight:800; }
+.primary:hover { background:#f3db55; color:#233e29; }
+.topbar #logout,#logout.quiet,#endSession { color:#ffd9d2; background:#ff6b6b25; border-color:#ff6b6b88; }
+.topbar #logout:hover,#logout.quiet:hover,#endSession:hover { background:#ff6b6b40; }
+.topbar nav,.topbar nav a { color:var(--chalk); }
+.topbar nav a { color:var(--yellow); }
+dialog.teacher-auth { background:#233e29; color:var(--chalk); border:2px solid #f5f5dc70; }
+dialog.teacher-auth h2,
+dialog.teacher-auth p,
+dialog.teacher-auth label { color:var(--chalk); }
+dialog.teacher-auth .muted { color:var(--muted); }
+dialog.teacher-auth .section-label { color:var(--yellow); }
+.auth-icon { background:#ffd7001a; color:var(--yellow); border:1px dashed var(--yellow); }
+.auth-close { border:0; background:transparent; color:var(--chalk); }
+.teacher-auth::backdrop,dialog::backdrop { background:#122116b8; backdrop-filter:blur(4px); }
+.guide,.consent,.manual-section,.roster-settings,.clock-line,.privacy-note { border-color:var(--line); }
+.guide summary,.text-button,.link-button,summary { color:var(--yellow); }
+.text-button,.link-button { background:none; border:0; }
+.privacy-copy p,.privacy-copy h3,.notice { color:var(--chalk); }
+.notice,.note { background:#f5f5dc09; border-radius:5px; }
+.attendance-surface .board-heading h2 { font-size:36px; }
+.attendance-surface #today,.attendance-surface .class-line label,.attendance-surface #classId,
+.attendance-surface .list-heading h3,.attendance-surface .manual-section h3,.clock-line strong { color:var(--chalk); }
+.attendance-surface h3 { font-family:KanaKyotai,'Gaegu',cursive; }
+.attendance-stats>div { background:#f5f5dc08; border-color:var(--line); border-radius:7px 10px 6px 8px; }
+.attendance-stats .present-stat { background:#ffd7000a; color:var(--yellow); }
+.attendance-stats .absent-stat { background:#ff6b6b0e; color:#ffaaa2; }
+.absence-badge,.down,.verdict.fail,.diff-line .bad,.status.err,.auth-status,#message,#rosterMessage { color:#ffaaa2; }
+.absence-badge::before { background:var(--red); }
+.manual-section p,.roster-settings p,.board-footnote,.list-heading>span,#empty { color:var(--muted); }
+th { color:var(--chalk); background:#365339; border-bottom:1px solid #f5f5dc80; }
+td,th { border-color:var(--line); }
+td { color:var(--chalk); }
+tbody tr:hover { background:#f5f5dc07; }
+.badge { background:#ffd70018; color:var(--yellow); border:1px solid #ffd70040; }
+.badge.again { background:#ff6b6b18; color:#ffb0a6; border-color:#ff6b6b40; }
+.badge.pending { background:#ffffff15; color:var(--muted); }
+.page-heading h1 { font-size:34px; margin-top:24px; }
+.page-heading h1::after { content:''; display:block; width:min(260px,75%); border-bottom:2px solid var(--yellow); transform:rotate(-1deg); margin-top:9px; opacity:.8; }
+.filter-label,.student-filter,.summary-grid span,.summary-grid small,.method-note,.empty { color:var(--muted); }
+.filter-label { color:var(--chalk); }
+.class-buttons button { border-radius:46% 43% 48% 44%; }
+.class-buttons button[aria-pressed=true],.row-tab.active,button.active { background:#ffd70018; color:var(--yellow); border:2px solid var(--yellow); }
+.summary-grid strong { color:var(--yellow); }
+.summary-grid article { border-style:dashed; }
+.student-name,.attention-card ul { color:var(--chalk); }
+.weakest { color:var(--chalk); background:#f5f5dc08; border-color:var(--line); }
+.weakest small,.attention-top small,.attention-bottom,.legend { color:var(--muted); }
+.attention-card { border-left-color:var(--red); }
+.priority { color:#ffb0a6; border-color:var(--red); }
+.chart svg text { fill:var(--muted); }
+.chart-tooltip { background:var(--chalk); color:var(--board-dark); border:1px solid var(--yellow); }
+.up { color:var(--yellow); }
+.blue { background:var(--yellow); }.red { background:var(--red); }
+.learning-nav { padding-inline:18px; }
+.row-tab { background:#f5f5dc09; color:var(--chalk); border-color:#f5f5dc70; border-radius:7px 11px 6px 8px; }
+.row-tab .suffix,.row-tab.active .suffix { color:var(--muted); }
+.stage-wrap { border:2px solid #b89867; border-radius:9px; box-shadow:0 8px 20px #10241640; overflow:hidden; }
+/* Flash contains the original stroke movies on a white teaching sheet. */
+.stage,.lesson-title { background:white; }
+.lesson-title,.lesson-title span { color:#2D4A2D; }
+.lesson-title .lesson-title-suffix { color:#965322; }
+.pronunciation-link,.return-link { background:var(--board); color:var(--chalk); border:2px solid #f5f5dc90; }
+.mic { color:var(--board-dark); background:var(--yellow); border:3px solid #fff4ac; box-shadow:0 0 0 6px #ffd70015; }
+.mic.recording { background:var(--red); color:#fff; border-color:#ffd3cd; }
+.mic-hint,.save-status,.heard-box span,.verdict-sub,.speaking-title,.ring small { color:var(--muted); }
+.ring::before { background:var(--board-dark); }
+.ring b,.heard-box b { color:var(--chalk); }
+#longVowelNote { color:var(--yellow)!important; }
+.word-selection { border-color:#b87900; }
+:is(a,button,input,select,textarea,summary):focus-visible { outline:3px solid var(--yellow); outline-offset:4px; }
+@media(max-width:700px) {
+  .surface { padding:24px; }.page-heading h1 { font-size:28px; }
+  .intro h1 { font-size:48px; }.learning-nav { flex-wrap:wrap; }
+}
+@media(prefers-reduced-motion:reduce) { *,*::before,*::after { scroll-behavior:auto!important; transition:none!important; } }
+
+body input[type="text"],body input[type="password"],body input:not([type]),body input[inputmode]{background:#1f3827;color:var(--chalk);border-color:#f5f5dc70;border-radius:5px 8px 5px 7px}
+.intro h1 span{font-family:inherit}
+
+body h2{font-size:26px}body h3{font-size:21px}.attendance-surface h3{font-size:18px}.teacher-auth h2{font-size:34px}
+.attendance-surface .section-label{font-size:15px}
+.attendance-surface .small-button,.attendance-surface .mark-present{font-size:15px}
+.attendance-surface .clock-line,.attendance-surface .class-line,.attendance-surface #classId{font-size:16px}
+.attendance-surface .attendance-stats span{font-size:15px}
+.attendance-surface .list-heading>span,.attendance-surface .board-footnote,.attendance-surface .manual-section p,.attendance-surface .manual-section label,.attendance-surface .roster-settings,.attendance-surface .roster-settings label{font-size:15px}
+.attendance-surface table{font-size:16px}
+.attendance-surface th{font-size:14px}
+.attendance-surface .manual-section input,.attendance-surface .manual-section select,.attendance-surface .manual-section .primary,.attendance-surface #message,.attendance-surface #rosterMessage,.attendance-surface #empty{font-size:16px}
+#privacy .privacy-copy,#privacy .privacy-copy h3,#privacy .privacy-copy p{font-family:"Malgun Gothic","Apple SD Gothic Neo","Noto Sans KR",sans-serif;text-shadow:none;letter-spacing:0}
+#privacy .privacy-copy h3{font-weight:700}
+
+.ring span{background:var(--board-dark)}
+.intro::after{content:'';display:block;width:124px;height:48px;margin:24px 0 0 auto;opacity:.7;background:center/contain no-repeat url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 130 50'%3E%3Cg fill='none' stroke='%23F5F5DC' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 35Q65 48 111 13M93 11l21 1-4 22'/%3E%3Cpath d='M18 4l3 8 9 1-8 4 1 9-6-7-8 2 5-7-5-6 9 2z' stroke='%23FFD700'/%3E%3C/g%3E%3C/svg%3E")}
+@media(max-width:700px){.intro::after{display:none}}

@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#f4efe6">
+  <title>와사비 — 일본어 발음 연습</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Kaisei+Decol:wght@500;700&family=Noto+Sans+KR:wght@400;500;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="wrap">
+    <header>
+      <div class="mark" id="mark">飛 び 石</div>
+      <h1 id="appName">토비이시</h1>
+      <p>일본어 발음 연습 · 소리 내어 읽으면 인식 성공률을 판정합니다 (70% 이상 통과)</p>
+    </header>
+
+    <section id="startView">
+      <div class="banner" id="deviceNote"></div>
+      <div class="card welcome">
+        <div class="stone" aria-hidden="true">
+          <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor"><path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2Z"/></svg>
+        </div>
+        <p>일본어 문장을 <b>소리 내어 읽으면</b>, 발음이 얼마나 정확한지 <b>점수로 확인</b>해 주는 연습 앱이에요.</p>
+      </div>
+
+      <div class="card">
+        <div class="label">사용 방법</div>
+        <ol class="steps">
+          <li><span class="n">1</span><div>핸드폰에서 <b>아이폰은 Safari, 안드로이드는 Chrome</b>으로 이 페이지를 엽니다.</div></li>
+          <li><span class="n">2</span><div>카카오톡 등 <b>앱 내부 브라우저에서는 마이크가 막혀</b> 작동하지 않습니다. 반드시 정식 브라우저에서 여세요.</div></li>
+          <li><span class="n">3</span><div>마이크 버튼을 처음 누르면 권한 요청이 뜹니다. <b>허용</b>을 눌러야 인식됩니다.</div></li>
+        </ol>
+      </div>
+
+      <div class="card">
+        <div class="label">개인정보 수집·이용 안내</div>
+        <div class="privacy" id="privacy">
+          <p>이 앱은 일본어 발음 학습을 돕기 위해 아래와 같이 최소한의 개인정보를 처리합니다. 만 14세 이상 학생을 대상으로 합니다.</p>
+          <h3>1. 수집 항목 (최소 수집)</h3>
+          <p>· 학번, 이름</p>
+          <p>· 발음 연습 결과 (인식된 문자, 점수, 통과 여부, 연습 일시)</p>
+          <p class="soft">※ 음성 녹음 파일은 저장하지 않습니다. 발음은 글자로 변환된 뒤 즉시 폐기됩니다.</p>
+          <h3>2. 수집·이용 목적</h3>
+          <p>· 일본어 발음 학습 지도 및 학습 결과 확인·피드백</p>
+          <h3>3. 보유·이용 기간</h3>
+          <p>· 기기에 저장된 기록: 이용자가 삭제하거나 브라우저 데이터를 지울 때까지</p>
+          <p>· 교사가 수집한 기록: 수집일로부터 1년 후 파기</p>
+          <h3>4. 안전성 확보 조치</h3>
+          <p>· 음성 파일을 저장하지 않음 (글자 변환 후 폐기)</p>
+          <p>· 결과 전송 시 암호화된 통신(HTTPS) 사용</p>
+          <p>· 수집 결과는 담당교사만 접근, 공유 범위 최소화</p>
+          <p class="soft">※ 음성 인식은 기기·브라우저의 음성인식 기능을 이용하며, 기기 종류에 따라 음성이 인식 처리를 위해 브라우저 제공업체 서버로 전송될 수 있습니다.</p>
+          <h3>5. 열람·정정·삭제·처리정지</h3>
+          <p>· 앱 내 [기록 보기 → 전체 기록 삭제]로 본인이 직접 삭제할 수 있습니다.</p>
+          <p>· 그 밖의 열람·정정·처리정지는 아래 보호책임자에게 요청할 수 있습니다.</p>
+          <h3>6. 만 14세 미만 아동</h3>
+          <p>· 본 서비스는 만 14세 이상을 대상으로 합니다. 만 14세 미만은 법정대리인(보호자)의 동의를 받은 후 이용해야 합니다.</p>
+          <h3>7. 개인정보 보호책임자</h3>
+          <p>· 성명: <b id="officerName">김정민</b></p>
+          <p>· 연락처: <b id="officerContact">yoriteacher@gmail.com</b>　소속: <b id="officerOrg">흥진고</b></p>
+          <h3>8. 제3자 제공</h3>
+          <p>· 수집한 개인정보는 원칙적으로 제3자에게 제공하지 않습니다.</p>
+          <h3>9. 처리위탁</h3>
+          <p>· 학습 결과 저장·전송을 위해 Google(구글 스프레드시트·앱스 스크립트) 서비스를 이용할 수 있습니다. (해당 기능 사용 시)</p>
+          <p class="soft">※ 본 안내는 서식 예시이며, 실제 운영 전 학교 개인정보 보호 방침에 맞게 검토·수정이 필요합니다.</p>
+        </div>
+      </div>
+
+      <form class="card" id="startForm">
+        <div class="label">학생 정보</div>
+        <p class="hint">학번과 이름을 입력하면 연습 점수가 기록됩니다.</p>
+        <label class="field">
+          <input id="numberInput" type="text" inputmode="numeric" autocomplete="off" placeholder="학번 (예: 10325)">
+        </label>
+        <label class="field">
+          <input id="nameInput" type="text" autocomplete="name" placeholder="이름 (예: 김민준)">
+        </label>
+        <label class="consent">
+          <input id="consentCheck" type="checkbox">
+          <span>위 개인정보 수집·이용 안내를 확인했으며, 이에 <b>동의합니다.</b></span>
+        </label>
+        <button class="primary" type="submit">연습 시작하기</button>
+        <div class="warn-line" id="startWarn" role="alert"></div>
+      </form>
+    </section>
+
+    <section id="practiceView" class="hidden">
+      <div class="bar">
+        <div>학생: <b id="whoName"></b></div>
+        <div class="links">
+          <button type="button" id="growthBtn">내 성장</button>
+          <button type="button" id="recordBtn">기록 보기</button>
+          <button type="button" id="editBtn">이름 변경</button>
+        </div>
+      </div>
+      <div class="banner err" id="practiceWarn"></div>
+
+      <div class="card">
+        <div class="label">연습 문장 선택</div>
+        <div class="chips" id="categoryTabs" hidden></div>
+        <div class="chips phrase-chips" id="phraseTabs"></div>
+        <div class="target">
+          <div class="jp" id="targetJp"></div>
+          <div class="kor" id="targetKor"></div>
+          <input class="custom-input hidden" id="customInput" type="text" lang="ja" placeholder="히라가나로 문장을 입력하세요" autocomplete="off">
+          <div class="custom-hint hidden" id="customHint">직접 입력한 문장으로 채점합니다. 히라가나가 더 정확합니다.</div>
+          <button class="listen" id="listenBtn" type="button">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M3 10v4h4l5 5V5L7 10H3Zm13.5 2A4.5 4.5 0 0 0 14 7.97v8.05A4.5 4.5 0 0 0 16.5 12ZM14 3.06v2.02a7 7 0 0 1 0 13.84v2.02a9 9 0 0 0 0-17.88Z"/></svg>
+            발음 들어보기
+          </button>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="label">발음하기</div>
+        <div class="mic-wrap">
+          <button class="mic" id="micBtn" type="button" aria-label="발음 녹음">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2Z"/></svg>
+          </button>
+          <div class="mic-hint" id="micHint">버튼을 누르고 문장을 읽어 보세요</div>
+        </div>
+        <div class="heard" id="heard"><small>인식된 발음</small><div class="txt" id="heardText"></div></div>
+      </div>
+
+      <div class="card result" id="result">
+        <div class="gauge" aria-hidden="true">
+          <svg width="160" height="160" viewBox="0 0 160 160">
+            <circle cx="80" cy="80" r="68" fill="none" stroke="#eadfce" stroke-width="12"/>
+            <circle id="gaugeArc" cx="80" cy="80" r="68" fill="none" stroke="#1d7a46" stroke-width="12" stroke-linecap="round" stroke-dasharray="427.26" stroke-dashoffset="427.26"/>
+          </svg>
+          <div class="gauge-num">
+            <span class="pct" id="pctNum">0%</span>
+            <span class="pct-label">인식 성공률</span>
+          </div>
+        </div>
+        <div class="verdict" id="verdict"></div>
+        <div class="verdict-sub" id="verdictSub"></div>
+        <div class="diff" id="diff"></div>
+        <button class="retry" id="retryBtn" type="button">다시 연습하기</button>
+      </div>
+
+      <div class="threshold">
+        통과 기준
+        <input id="threshold" type="range" min="50" max="100" value="70">
+        <strong><span id="thresholdVal">70</span>%</strong>
+      </div>
+      <p class="note">인식 성공률은 발음을 목표 문장과 글자 단위로 비교해 계산합니다.</p>
+    </section>
+
+    <section id="recordView" class="hidden">
+      <div class="bar">
+        <b>연습 기록</b>
+        <button class="linkish" id="recordBack" type="button">연습으로</button>
+      </div>
+      <div class="card">
+        <div class="label">학생별 요약</div>
+        <div class="summary" id="summary"></div>
+        <div class="actions">
+          <button class="ghost" id="exportBtn" type="button">CSV 내보내기</button>
+          <button class="danger" id="clearBtn" type="button">전체 기록 삭제</button>
+        </div>
+        <div class="label">전체 기록</div>
+        <div class="log" id="log"></div>
+        <p class="note">기록은 이 브라우저에 저장됩니다. 시트를 연결했다면 점수는 그쪽으로도 전달됩니다. 음성 파일은 어디에도 남기지 않습니다.</p>
+      </div>
+    </section>
+
+    <section id="growthView" class="hidden">
+      <div class="bar">
+        <b>내 성장</b>
+        <button class="linkish" id="growthBack" type="button">연습으로</button>
+      </div>
+      <div class="card">
+        <div class="label" id="growthName">학생</div>
+        <div class="chart-box">
+          <svg id="growthChart" viewBox="0 0 320 180" width="100%" role="img" aria-label="점수 변화"></svg>
+          <div class="legend">
+            <span><i style="background:#c4552a"></i>점수</span>
+            <span><i style="background:#b7c4a4"></i>통과 기준</span>
+          </div>
+        </div>
+        <div class="stats" id="growthStats"></div>
+      </div>
+    </section>
+  </div>
+  <script type="module" src="js/app.js"></script>
+</body>
+</html>

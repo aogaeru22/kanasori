@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>가나 — 일본어 학습 다시 보기</title>
+  <style>
+    :root {
+      --bg: #f3efe6;
+      --card: #fffdf8;
+      --ink: #241c16;
+      --muted: #6d6256;
+      --line: #e4d8c6;
+      --indigo: #243e66;
+      --persimmon: #c4552a;
+      --pass: #1d7a46;
+      --fail: #c44536;
+      --below: 170px;
+    }
+    body.scored { --below: 330px; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      height: 100vh;
+      height: 100dvh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      font-family: "Malgun Gothic", "Noto Sans KR", sans-serif;
+      color: var(--ink);
+      background: linear-gradient(180deg, #fbf7f1, #f3eee6);
+      overflow: auto;
+    }
+    .learning-nav { display:flex; align-items:center; justify-content:center; gap:16px; padding:10px; min-height:52px; font-size:16px; flex-wrap:wrap; }
+    .learning-nav a { color:var(--indigo); }
+    #saveRetry { margin:8px; }
+    .mic-hint { max-width:90vw; }
+    header, .bar, .pages, .status { display: none; }
+    main { width: 100%; margin: 0; padding: 0; }
+    .kana-tabs {
+      container-type: inline-size;
+      display: flex;
+      gap: 6px;
+      width: min(calc(100vw - 20px), calc((100dvh - var(--below) - 64px) * 800 / 409));
+      margin: 10px auto 8px;
+    }
+    .row-tab {
+      flex: 1;
+      min-width: 0;
+      height: 50px;
+      display: flex;
+      flex-direction: row;
+      align-items: center;
+      justify-content: center;
+      gap: 3px;
+      padding: 0 3px;
+      border: 1px solid #e7dccb;
+      border-radius: 13px;
+      background: #fffdf9;
+      color: #243e66;
+      box-shadow: 0 10px 18px -16px rgba(36, 32, 24, 0.7);
+      cursor: pointer;
+    }
+    .row-tab .kana {
+      font-family: KanaKyotai, "Yu Mincho", serif;
+      font-size: clamp(18px, 5cqw, 34px);
+      font-weight: 700;
+      line-height: 1;
+    }
+    .row-tab .suffix {
+      font-size: 10px;
+      line-height: 1;
+      align-self: center;
+      margin-top: 8px;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: #8d7d6c;
+    }
+    .row-tab:hover { border-color: #c4552a; }
+    .row-tab.active {
+      background: #243e66;
+      border-color: #243e66;
+      color: #fff;
+      box-shadow: 0 12px 20px -14px rgba(36, 62, 102, 0.85);
+    }
+    .row-tab.active .suffix { color: #f0d7a8; }
+    .row-tab:focus-visible { outline: 3px solid #c4552a; outline-offset: 3px; }
+    @media (max-width: 480px) {
+      .kana-tabs { gap: 4px; }
+      .row-tab { height: 54px; flex-direction: column; gap: 3px; padding: 3px 0; border-radius: 10px; }
+      .row-tab .kana { font-size: 25px; }
+      .row-tab .suffix { margin-top: 0; font-size: 9px; }
+    }
+    @container (max-width: 480px) {
+      .row-tab { height: 54px; flex-direction: column; gap: 3px; padding: 3px 0; border-radius: 10px; }
+      .row-tab .kana { font-size: clamp(15px, 6cqw, 25px); }
+      .row-tab .suffix { margin-top: 0; font-size: 9px; }
+    }
+    button {
+      font: inherit;
+      border: 1px solid var(--line);
+      background: white;
+      color: var(--muted);
+      border-radius: 999px;
+      padding: 8px 12px;
+      cursor: pointer;
+    }
+    button.active { background: var(--indigo); border-color: var(--indigo); color: white; }
+    .pages button.active { background: var(--persimmon); border-color: var(--persimmon); }
+    .stage-wrap {
+      container-type: inline-size;
+      width: min(calc(100vw - 20px), calc((100dvh - var(--below) - 64px) * 800 / 409));
+      aspect-ratio: 800 / 409;
+      margin: 0 auto;
+      overflow: hidden;
+      position: relative;
+      background: #fff;
+    }
+    .stage {
+      position: absolute;
+      left: 0;
+      width: 100%;
+      top: calc(71 / 409 * -100%);
+      height: calc(520 / 409 * 100%);
+      background: #fff;
+    }
+    .stage ruffle-player, .stage ruffle-object { width: 100%; height: 100%; display: block; }
+    .lesson-title {
+      position: absolute;
+      z-index: 2;
+      left: 8.5%;
+      top: 0;
+      width: 29%;
+      height: 9.5%;
+      display: flex;
+      align-items: center;
+      gap: .4em;
+      background: #fff;
+      color: #243e66;
+      font-size: 2.65cqw;
+      font-weight: 700;
+      line-height: 1;
+      pointer-events: none;
+    }
+    .lesson-title-suffix { color: #a94824; }
+    body.writing { --below: 0px; height: 100dvh; max-height: 100dvh; min-height: 0; overflow: hidden; background: #fff; }
+    body.writing::after { display: none; }
+    body.writing .learning-nav { flex: none; }
+    body.writing main { flex: 1 1 auto; min-height: 0; display: flex; flex-direction: column; }
+    body.writing .lesson-fit {
+      flex: 1 1 auto; min-height: 0; width: 100%;
+      display: flex; flex-direction: column; align-items: center; justify-content: center;
+      padding: 0 8px 8px; container-type: size;
+    }
+    body.writing .kana-tabs,
+    body.writing .stage-wrap { width: min(100cqw, calc((100cqh - 64px) * 800 / 409)); }
+    body.writing .kana-tabs { margin: 0 auto 6px; }
+    body.writing .stage-wrap { max-height: calc(100cqh - 64px); }
+    body.writing .recorder, body.writing .practice-navigation { display: none; }
+    .pronunciation-link {
+      position: absolute; right: .8%; bottom: 3%; width: 12%;
+      display: flex; flex-direction: column; align-items: center; gap: .65cqw;
+      padding: 1.3cqw .3cqw; border-radius: 1.6cqw;
+      background: linear-gradient(145deg, #365e8d, #203e66);
+      border: 1px solid #426893; color: white; text-align: center;
+      box-shadow: 0 .4cqw 0 #142d4d, 0 .7cqw 1.2cqw #243e6626;
+      font-size: 1.75cqw; font-weight: 700; text-decoration: none; z-index: 3;
+      transition: transform .15s, box-shadow .15s;
+    }
+    .pronunciation-link svg { width: 2.8cqw; height: 2.8cqw; padding: .45cqw; border-radius: 50%; background: #ffffff24; }
+    .pronunciation-link:hover { transform: translateY(-2px); }
+    .pronunciation-link:active { transform: translateY(2px); box-shadow: 0 1px 0 #142d4d; }
+    .pronunciation-link:focus-visible { outline: 3px solid #c4552a; outline-offset: 3px; }
+    body.words .pronunciation-link { display: none; }
+    body.words .kana-tabs, body.words .practice-navigation { display: none; }
+    .return-link { display: none; }
+    body.words .return-link {
+      display: flex; align-items: center; justify-content: center; gap: .45em;
+      position: absolute; z-index: 3; right: 1%; bottom: 4%;
+      padding: 1.3cqw 1.5cqw; border-radius: 1.5cqw;
+      color: #fff; background: linear-gradient(145deg, #365e8d, #203e66);
+      border: 1px solid #426893; box-shadow: 0 .35cqw 0 #142d4d, 0 .6cqw 1cqw #243e6626;
+      font-size: 1.8cqw; font-weight: 700; text-decoration: none;
+    }
+    .return-link:hover { filter: brightness(1.12); }
+    .return-link:focus-visible { outline: 3px solid #c4552a; outline-offset: 3px; }
+    body.words, body.words.scored { --below: 310px; height: auto; min-height: 100dvh; }
+    body.words .stage-wrap { width: min(calc(100vw - 20px), max(300px, calc((100dvh - 310px - 64px) * 800 / 409))); }
+    body.words .recorder { width: min(calc(100vw - 20px), 560px); }
+    body.words .lesson-title { width: 30%; height: 15%; }
+    .practice-navigation { display: flex; justify-content: center; gap: 12px; margin: 12px auto; }
+    .practice-navigation a { padding: 10px 14px; border: 1px solid var(--line); border-radius: 12px; background: white; color: var(--indigo); text-decoration: none; }
+    .status { min-height: 22px; margin: 8px 2px 0; color: var(--muted); font-size: 13px; }
+    .status.err { color: #9a3e1c; }
+    .recorder {
+      width: min(calc(100vw - 20px), calc((100dvh - var(--below) - 64px) * 800 / 409));
+      margin: 6px auto 8px;
+      text-align: center;
+    }
+    .mic {
+      position: relative;
+      width: 46px;
+      height: 46px;
+      border: none;
+      border-radius: 50%;
+      color: #fff;
+      background: radial-gradient(circle at 35% 30%, #e07a52, #9a3e1c);
+      box-shadow: 0 8px 16px -10px rgba(154, 62, 28, 0.8);
+      display: inline-grid;
+      place-items: center;
+      cursor: pointer;
+      padding: 0;
+    }
+    .mic svg { width: 22px; height: 22px; }
+    .mic.recording { animation: pulse 1.2s infinite; }
+    .mic.recording::before, .mic.recording::after {
+      content: "";
+      position: absolute;
+      inset: -4px;
+      border-radius: 50%;
+      border: 2px solid #c4552a;
+      animation: ring 1.6s ease-out infinite;
+      pointer-events: none;
+    }
+    .mic.recording::after { animation-delay: .8s; }
+    .mic.recording { background: radial-gradient(circle at 35% 30%, #f38c61, #bf4524); }
+    body.words .mic { width: 96px; height: 96px; margin: 26px 0 18px; }
+    body.words .mic svg { width: 32px; height: 32px; }
+    .speaking-card { padding: 16px 14px 18px; border: 1px solid var(--line); border-radius: 14px; background: #f9faef; }
+    .speaking-title { margin: 0; text-align: left; color: #758735; font-size: 12px; font-weight: 700; }
+    .save-status { margin: 10px 0 0; min-height: 16px; color: var(--muted); font-size: 11px; overflow-wrap: anywhere; }
+    .save-status:empty { display: none; }
+    .warning-overlays { position:absolute; inset:0; z-index:4; pointer-events:none; }
+    .unified-warning { position:absolute; transform:translate(-50%,-50%); background:white; display:flex; align-items:center; justify-content:center; }
+    .unified-warning svg { width:100%; height:100%; display:block; }
+    .word-selection { position:absolute; z-index:2; width:12%; aspect-ratio:1; border:clamp(2px,.35cqw,4px) solid #287556; border-radius:50%; transform:translate(-50%,-50%); box-shadow:0 0 0 5px #28755626; pointer-events:none; }
+    .word-selection::after { content:'✓ 선택'; position:absolute; bottom:-18px; left:50%; transform:translateX(-50%); white-space:nowrap; background:#287556; color:white; border-radius:12px; padding:3px 9px; font-size:12px; }
+    @keyframes pulse {
+      0%, 100% { box-shadow: 0 8px 16px -10px rgba(154, 62, 28, 0.6); }
+      50% { box-shadow: 0 10px 22px -4px rgba(196, 85, 42, 0.95); }
+    }
+    @keyframes ring {
+      0% { transform: scale(1); opacity: 0.55; }
+      100% { transform: scale(1.9); opacity: 0; }
+    }
+    .mic:disabled { opacity: 0.45; cursor: not-allowed; }
+    .mic-hint { margin: 4px 0 0; color: var(--muted); font-size: 16px; min-height: 24px; }
+    .score-result {
+      display: none;
+      margin-top: 12px;
+      padding: 22px 16px 18px;
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      background: #f9faef;
+      text-align: center;
+    }
+    .score-result.show { display: block; animation: result-appear .24s ease-out; }
+    @keyframes result-appear { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+    @media (prefers-reduced-motion: reduce) { .score-result.show, .mic.recording, .mic.recording::before, .mic.recording::after { animation: none; } }
+    .heard-box {
+      width: min(100%, 560px);
+      min-height: 74px;
+      margin: 12px auto 10px;
+      padding: 12px 16px;
+      overflow-wrap: anywhere;
+      border-radius: 12px;
+      background: #fff;
+      border: 1px solid #ece7dc;
+    }
+    .heard-box span { display: block; color: var(--muted); font-size: 11px; }
+    .heard-box b {
+      display: block;
+      margin-top: 2px;
+      font-family: KanaKyotai, "Yu Mincho", serif;
+      font-size: 22px;
+      font-weight: 500;
+    }
+    .heard-box[hidden] { display: none; }
+    .judge-row {
+      display: grid;
+      grid-template-columns: 1fr;
+      justify-items: center;
+      gap: 10px;
+      align-items: center;
+      text-align: center;
+    }
+    .ring {
+      width: 112px;
+      height: 112px;
+      border-radius: 50%;
+      background: conic-gradient(var(--ring, var(--pass)) calc(var(--p) * 1%), #eadfce 0);
+      display: grid;
+      place-items: center;
+    }
+    .ring span {
+      width: 92px;
+      height: 92px;
+      border-radius: 50%;
+      background: #f9faef;
+      display: grid;
+      place-items: center;
+      align-content: center;
+    }
+    .ring b { font-size: 30px; line-height: 1; }
+    .ring small { font-size: 9px; color: var(--muted); font-weight: 600; }
+    .score-copy { min-width: 0; }
+    .verdict { font-weight: 800; font-size: 18px; }
+    .verdict.pass { color: var(--pass); }
+    .verdict.fail { color: #d3542c; }
+    .verdict-sub { margin: 2px 0 0; color: #5c564c; font-size: 12px; line-height: 1.35; }
+    .diff-line { margin: 4px 0 0; font-size: 16px; line-height: 1.4; font-family: KanaKyotai, "Yu Mincho", serif; }
+    .diff-line .tag { color: var(--muted); font-size: 12px; font-family: "Malgun Gothic", "Noto Sans KR", sans-serif; margin-right: 4px; }
+    .diff-line .ok { color: var(--pass); }
+    .diff-line .bad { color: #c4322c; text-decoration: underline wavy #c4322c; text-underline-offset: 5px; text-decoration-thickness: 2px; }
+    .threshold {
+      grid-column: 1 / -1;
+      display: block;
+      margin: 12px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .threshold input { flex: 1; accent-color: var(--pass); }
+    .retry {
+      border: none;
+      background: var(--ink);
+      color: #fff;
+      border-radius: 999px;
+      padding: 7px 10px;
+      font-size: 12px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+  </style>
+  <script>
+    window.RufflePlayer = window.RufflePlayer || {};
+    window.RufflePlayer.config = {
+      autoplay: "on",
+      unmuteOverlay: "visible",
+      letterbox: "off",
+      splashScreen: false,
+      showSwfDownload: false,
+      scale: "showAll",
+      warnOnUnsupportedContent: false
+    };
+    window.doInitialize = function () { return true; };
+    window.doTerminate = function () { return true; };
+    window.doSetValue = function () { return true; };
+    window.doGetValue = function () { return ""; };
+    window.API_1484_11 = {
+      Initialize: function () { return "true"; },
+      Terminate: function () { return "true"; },
+      GetValue: function () { return ""; },
+      SetValue: function () { return "true"; },
+      Commit: function () { return "true"; },
+      GetLastError: function () { return "0"; },
+      GetErrorString: function () { return ""; },
+      GetDiagnostic: function () { return ""; }
+    };
+  </script>
+  <script src="https://unpkg.com/@ruffle-rs/ruffle@0.4.1/ruffle.js"></script>
+<link rel="stylesheet" href="/css/japanese-fonts.css"><link rel="stylesheet" href="/css/chalkboard.css"></head>
+<body class="writing">
+  <header>
+    <h1>가나 학습 다시 보기</h1>
+    <p>고등학교 공통 일본어 I 자료를 플래시 없이 브라우저에서 재생합니다. 소리가 있으면 화면 안 소리 버튼을 눌러 주세요.</p>
+  </header>
+  <nav class="learning-nav" aria-label="학습 메뉴"><a href="/">かな소리</a><span id="learner"></span><a href="/results.html">나의 결과</a><button id="endSession" type="button">학습 종료</button></nav><main>
+    <div class="lesson-fit">
+    <nav class="kana-tabs" id="kanaTabs" aria-label="히라가나 행"></nav>
+    <div class="bar" id="lessons"></div>
+    <div class="bar" id="sections"></div>
+    <div class="pages" id="pages"></div>
+    <div class="stage-wrap">
+      <div class="stage" id="stage"></div>
+      <div class="lesson-title" aria-label="학습 제목"><span id="lessonRowTitle"></span><span class="lesson-title-suffix">발음</span></div>
+      <a class="pronunciation-link" id="pronunciationLink" href="#"><svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2Z"/></svg><span>발음 연습 <span aria-hidden="true">→</span></span></a>
+      <div class="status" id="status">자료를 불러오는 중입니다.</div>
+      <a class="return-link" id="returnToWriting" href="#"><span aria-hidden="true">←</span> 돌아가기</a>
+      <div id="warningOverlays" class="warning-overlays" aria-hidden="true"></div>
+      <div id="wordSelection" class="word-selection" hidden></div>
+    </div>
+    </div>
+    <p id="longVowelNote" hidden style="text-align:center;color:#52632b;font-size:14px;margin:12px 16px" lang="ko">おおい: ‘오-이’처럼 첫소리를 길게 이어서 발음하세요. 표기는 おおい입니다.</p>
+    <section class="recorder" aria-label="발음 녹음">
+      <div class="speaking-card" id="speakingCard">
+      <button class="mic" id="micBtn" type="button" aria-label="발음 녹음">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V21h2v-3.08A7 7 0 0 0 19 11h-2Z"/></svg>
+      </button>
+      <p class="mic-hint" id="micHint" role="status" aria-live="polite">버튼을 누른 뒤 ‘듣고 있어요’가 표시되면 읽어 주세요. · 70% 이상 통과</p>
+      <div class="heard-box" id="heardBox" hidden role="status" aria-live="polite" aria-atomic="true"><span>인식된 발음</span><b id="heardText" lang="ja"></b></div>
+      </div>
+      <div class="score-result" id="scoreResult" role="status" aria-live="polite" aria-atomic="true">
+        <div class="judge-row">
+          <div class="ring" id="scoreRing" role="img" aria-label="인식률 0%" style="--p:0"><span aria-hidden="true"><b id="scoreNum">0%</b><small>인식률</small></span></div>
+          <div class="score-copy">
+            <div class="verdict" id="scoreVerdict"></div>
+            <p class="verdict-sub" id="verdictSub"></p>
+            <p class="diff-line" id="diffLine"></p>
+          </div>
+          <button class="retry" id="retryBtn" type="button">다시 연습하기</button>
+        </div>
+      </div>
+      <p class="save-status" id="saveStatus" role="status" aria-live="polite"></p>
+      <button type="button" id="saveRetry" hidden>결과 저장 재시도</button>
+    </section>
+    <nav class="practice-navigation" aria-label="학습 단계 이동"><a id="backToWriting" href="#">← 획순·글자 연습</a><a id="nextRow" href="#">다음 행 →</a></nav>
+  </main>
+  <script type="module">
+    import { renderWarningIcons } from "../js/warning-icons.js";
+    import { LESSONS } from "../js/lessons.js";
+    import { setupPractice } from "../js/practice.js";
+    import { WORD_TARGETS, wordTarget } from "../js/word-targets.js";
+    const lessonsEl = document.getElementById("lessons");
+    const sectionsEl = document.getElementById("sections");
+    const pagesEl = document.getElementById("pages");
+    const stage = document.getElementById("stage");
+    const statusEl = document.getElementById("status");
+    const params = new URLSearchParams(location.search);
+    const wordMode = params.get('mode') === 'words';
+    document.body.className = wordMode ? 'words' : 'writing';
+    const ROWS = LESSONS;
+    const tabsEl = document.getElementById("kanaTabs");
+    const preferred = ROWS.find(row => row.file === params.get("file"))?.file || ROWS[0].file;
+
+    let catalog = null;
+    let lesson = null;
+    let section = null;
+    let currentFile = preferred;
+
+    function setStatus(text, isError) {
+      statusEl.textContent = text;
+      statusEl.classList.toggle("err", Boolean(isError));
+    }
+
+    function pageLabel(file) {
+      const name = file.split("/").pop().replace(/\.swf$/i, "");
+      const match = name.match(/-(\d+)$/);
+      return match ? match[1].replace(/^0/, "") + "쪽" : name;
+    }
+
+    function button(label, active, onClick) {
+      const el = document.createElement("button");
+      el.type = "button";
+      el.textContent = label;
+      el.classList.toggle("active", active);
+      el.addEventListener("click", () => { if (!practice.busy) onClick(); });
+      return el;
+    }
+
+    function renderLessons() {
+      lessonsEl.replaceChildren();
+      catalog.lessons.forEach((item) => {
+        lessonsEl.append(button(item.title, item.id === lesson.id, () => {
+          lesson = item;
+          section = item.sections.find((part) => part.id === "03") || item.sections[0];
+          currentFile = section.shell;
+          render();
+          play(currentFile);
+        }));
+      });
+    }
+
+    function renderSections() {
+      sectionsEl.replaceChildren();
+      lesson.sections.forEach((part) => {
+        sectionsEl.append(button(part.name, part.id === section.id, () => {
+          section = part;
+          currentFile = part.shell;
+          render();
+          play(currentFile);
+        }));
+      });
+    }
+
+    function renderPages() {
+      pagesEl.replaceChildren();
+      if (section.shell) {
+        pagesEl.append(button("처음부터", currentFile === section.shell, () => {
+          currentFile = section.shell;
+          render();
+          play(currentFile);
+        }));
+      }
+      section.pages.forEach((file) => {
+        pagesEl.append(button(pageLabel(file), currentFile === file, () => {
+          currentFile = file;
+          render();
+          play(currentFile);
+        }));
+      });
+    }
+
+    function renderTabs() {
+      tabsEl.replaceChildren();
+      ROWS.forEach((row) => {
+        const el = document.createElement("button");
+        el.type = "button";
+        el.className = "row-tab";
+        el.classList.toggle("active", currentFile === row.file);
+        el.setAttribute("aria-pressed", currentFile === row.file ? "true" : "false");
+        const kana = document.createElement("span");
+        kana.className = "kana";
+        kana.textContent = row.kana;
+        const suffix = document.createElement("span");
+        suffix.className = "suffix";
+        suffix.textContent = "행";
+        el.append(kana, suffix);
+        el.addEventListener("click", () => {
+          if (practice.busy) return;
+          currentFile = row.file;
+          renderTabs();
+          play(row.file);
+        });
+        tabsEl.append(el);
+      });
+    }
+
+    function render() {
+      renderTabs();
+      if (!catalog) return;
+      renderLessons();
+      renderSections();
+      renderPages();
+    }
+
+    let selectedWord = null;
+    const practice = setupPractice(() => wordMode ? selectedWord : ROWS.find(row => row.file === currentFile) || ROWS[0], { singleWord: wordMode });
+    const selection = document.getElementById('wordSelection');
+    // Observe the SWF's native pointer event so its original pronunciation still plays.
+    stage.addEventListener('pointerdown', event => {
+      if (!wordMode) return;
+      const bounds = stage.parentElement.getBoundingClientRect();
+      const x = (event.clientX - bounds.left) / bounds.width;
+      const y = (event.clientY - bounds.top) / bounds.height;
+      const row = ROWS.find(item => item.file === currentFile);
+      const words = WORD_TARGETS[row.id];
+      // The visible stage crops 71 native pixels from the 800 × 520 SWF.
+      const index = words.findIndex(word => Math.hypot((x * 800 - word.x) / (word.radius + 4), (y * 409 + 71 - word.y) / ((word.radiusY ?? word.radius) + 4)) <= 1);
+      if (index < 0) return;
+      if (!practice.changeSelection()) return;
+      selectedWord = wordTarget(row.id, index);
+      selection.hidden = false;
+      document.getElementById('longVowelNote').hidden = selectedWord.reading !== 'おおい';
+      selection.style.left = `${selectedWord.x / 800 * 100}%`;
+      selection.style.top = `${(selectedWord.y - 71) / 409 * 100}%`;
+      selection.style.width = `${(selectedWord.radius + 4) * 2 / 800 * 100}%`;
+      selection.style.aspectRatio = `${selectedWord.radius + 4} / ${(selectedWord.radiusY ?? selectedWord.radius) + 4}`;
+      selection.setAttribute('aria-label', `선택한 단어: ${selectedWord.reading}`);
+      document.getElementById('micHint').textContent = `목표: ${selectedWord.reading} · 녹음 버튼을 누르고 읽어 주세요.`;
+    }, true);
+    document.getElementById('micBtn').addEventListener('click', event => {
+      if (wordMode && !selectedWord) {
+        event.stopImmediatePropagation();
+        document.getElementById('micHint').textContent = '먼저 화면의 단어를 눌러 선택하고 발음을 들어 주세요.';
+      }
+    }, true);
+    document.querySelectorAll('#pronunciationLink, #returnToWriting, .practice-navigation a').forEach(link => link.addEventListener('click', event => {
+      if (practice.busy) { event.preventDefault(); return; }
+    }));
+
+    function play(file) {
+      practice.clear();
+      selectedWord = null;
+      document.getElementById('longVowelNote').hidden = true;
+      selection.hidden = true;
+      if (wordMode) document.getElementById('micHint').textContent = '먼저 단어를 눌러 발음을 듣고, 녹음 버튼을 눌러 주세요.';
+      const selectedRow = ROWS.find(item => item.file === file);
+      renderWarningIcons(document.getElementById("warningOverlays"), selectedRow?.id, wordMode);
+      document.getElementById('lessonRowTitle').textContent = selectedRow ? `${selectedRow.kana}행` : '';
+      document.querySelector('.lesson-title-suffix').textContent = wordMode ? '발음연습' : '발음';
+      const historyUrl = "?file=" + encodeURIComponent(file) + (wordMode ? '&mode=words' : '');
+      document.getElementById('pronunciationLink').href = '?file=' + encodeURIComponent(file) + '&mode=words';
+      document.getElementById('backToWriting').href = '?file=' + encodeURIComponent(file);
+      document.getElementById('returnToWriting').href = '?file=' + encodeURIComponent(file);
+      const next = ROWS[ROWS.indexOf(selectedRow) + 1];
+      document.getElementById('nextRow').href = next ? '?file=' + encodeURIComponent(next.file) : '/results.html';
+      document.getElementById('nextRow').textContent = next ? `다음 ${next.kana}행 →` : '나의 결과 →';
+      document.title = `${selectedRow?.kana || ''}행 ${wordMode ? '발음연습' : '획순·글자 연습'} · かな소리`;
+      history.replaceState(null, "", historyUrl);
+      setStatus(file + " 를 열고 있습니다.");
+      stage.replaceChildren();
+      const ruffle = window.RufflePlayer && window.RufflePlayer.newest && window.RufflePlayer.newest();
+      if (!ruffle) {
+        setStatus("재생 엔진을 불러오지 못했습니다. 인터넷에 연결된 뒤 새로고침해 주세요.", true);
+        return;
+      }
+      const player = ruffle.createPlayer();
+      player.style.width = "100%";
+      player.style.height = "100%";
+      stage.append(player);
+      const source = wordMode ? `voca_practice_hiragana/${selectedRow.id}행${selectedRow.id === 'wa' ? '_n' : ''}.swf` : file;
+      player.load(source + "?v=13-clean-a-endpoint").then(() => {
+        const row = ROWS.find((item) => item.file === file);
+        setStatus(row ? row.kana + "행" : pageLabel(file));
+      }).catch((error) => {
+        setStatus("이 쪽을 열지 못했습니다. " + (error && error.message ? error.message : ""), true);
+      });
+    }
+
+    function locate(file) {
+      for (const item of catalog.lessons) {
+        for (const part of item.sections) {
+          if (part.shell === file || part.pages.includes(file)) return { lesson: item, section: part };
+        }
+      }
+      return {
+        lesson: catalog.lessons[0],
+        section: catalog.lessons[0].sections.find((part) => part.id === "03")
+      };
+    }
+
+    render();
+    play(currentFile);
+
+    fetch("catalog.json")
+      .then((response) => response.json())
+      .then((data) => {
+        catalog = data;
+        const found = locate(preferred);
+        lesson = found.lesson;
+        section = found.section;
+        render();
+        if (practice.busy) document.querySelectorAll('.row-tab, #lessons button, #sections button, #pages button').forEach(button => { button.disabled = true; });
+      })
+      .catch(() => {
+        setStatus("목록을 읽지 못했습니다. 이 폴더에서 페이지를 열어 주세요.", true);
+      });
+  </script>
+</body>
+</html>
