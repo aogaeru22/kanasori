@@ -39,6 +39,11 @@ async function deliverRecoveryCode(sendMail, message) {
 }
 const digest = value => createHash('sha256').update(value).digest('hex');
 const failure = (status, message) => Object.assign(new Error(message), { status });
+function clientIp(req) {
+  const forwarded = req.headers['x-forwarded-for'];
+  if (typeof forwarded === 'string' && forwarded.trim()) return forwarded.split(',')[0].trim();
+  return req.socket?.remoteAddress || 'unknown';
+}
 function findLesson(id) {
   const match = /^(a|ka|sa|ta|na|ha|ma|ya|ra|wa)-word-([0-4])$/.exec(id);
   return match ? wordTarget(match[1], Number(match[2])) : LESSONS.find(item => item.id === id);
@@ -52,7 +57,7 @@ export function createApp({ db = openStore(resolve(process.env.DATA_DIR || 'data
   const sheets = createSheetsSync(db,{url:process.env.SHEETS_WEB_APP_URL,token:process.env.SHEETS_SYNC_TOKEN,preview});
   const rates = new Map();
   const schoolDay = () => new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
-  const markAttendance = (classId, number, status) => db.prepare('INSERT INTO attendance VALUES (?,?,?,?,?) ON CONFLICT(classId,number,day) DO UPDATE SET status=excluded.status,updated=excluded.updated').run(classId,number,schoolDay(),status,new Date().toISOString());
+  const markAttendance = async (classId, number, status) => { await db.prepare('INSERT INTO attendance VALUES (?,?,?,?,?) ON CONFLICT(classId,number,day) DO UPDATE SET status=excluded.status,updated=excluded.updated').run(classId,number,schoolDay(),status,new Date().toISOString()); };
   function limit(key, max) {
     const now = Date.now();
     if (rates.size > 10000) for (const [k, v] of rates) if (v.until < now) rates.delete(k);
@@ -60,7 +65,7 @@ export function createApp({ db = openStore(resolve(process.env.DATA_DIR || 'data
     if (!entry || entry.until < now) { rates.set(key, { count: 1, until: now + 60000 }); return; }
     if (++entry.count > max) throw failure(429, '요청이 많습니다. 1분 뒤 다시 시도하세요.');
   }
-  const server = createServer(async (req, res) => {
+  const handle = async (req, res) => {
     res.setHeader('X-Content-Type-Options', 'nosniff');
     res.setHeader('Referrer-Policy', 'same-origin');
     res.setHeader('X-Frame-Options', 'DENY');
@@ -69,6 +74,7 @@ export function createApp({ db = openStore(resolve(process.env.DATA_DIR || 'data
       res.end(type.startsWith('application/json') ? JSON.stringify(data) : data);
     };
     try {
+      if (db.ready) await db.ready;
       const url = new URL(req.url, 'http://localhost');
       let path = decodeURIComponent(url.pathname);
       if (!path.startsWith('/api/')) {
@@ -102,7 +108,7 @@ export function createApp({ db = openStore(resolve(process.env.DATA_DIR || 'data
       if (path.startsWith('/api/teacher/')) path = path.replace('/api/teacher/', '/api/');
       const cookieName = teacherRequest ? 'kanasori_teacher' : 'kanasori';
       const cookie = new RegExp(`(?:^|;\\s*)${cookieName}=([a-f0-9]{64})(?:;|$)`).exec(req.headers.cookie || '')?.[1];
-      const session = cookie && db.prepare('SELECT * FROM sessions WHERE token=? AND expires>? AND role=?').get(digest(cookie), Date.now(), teacherRequest ? 'teacher' : 'student');
+      const session = cookie && await db.prepare('SELECT * FROM sessions WHERE token=? AND expires>? AND role=?').get(digest(cookie), Date.now(), teacherRequest ? 'teacher' : 'student');
       const auth = role => { if (!session) throw failure(401, '로그인이 필요합니다.'); if (role && session.role !== role) throw failure(403, '접근 권한이 없습니다.'); return session; };
       const body = async () => {
         if (Number(req.headers['content-length']) > MAX_BODY) throw failure(413, '요청 내용이 너무 큽니다.');
@@ -112,23 +118,23 @@ export function createApp({ db = openStore(resolve(process.env.DATA_DIR || 'data
         catch { throw failure(400, '잘못된 요청입니다.'); }
       };
       const text = (value, max) => { if (typeof value !== 'string' || !value.trim() || value.length > max) throw failure(400, '입력 내용을 확인하세요.'); return value.trim(); };
-      const setSession = (role, owner, classId = null, number = null, name = null) => {
+      const setSession = async (role, owner, classId = null, number = null, name = null) => {
         const token = randomBytes(32).toString('hex');
-        db.prepare('DELETE FROM sessions WHERE expires<=? OR token=?').run(Date.now(), cookie ? digest(cookie) : '');
-        db.prepare('INSERT INTO sessions VALUES (?,?,?,?,?,?,?)').run(digest(token), role, owner, classId, number, name, Date.now() + 8 * 3600000);
+        await db.prepare('DELETE FROM sessions WHERE expires<=? OR token=?').run(Date.now(), cookie ? digest(cookie) : '');
+        await db.prepare('INSERT INTO sessions VALUES (?,?,?,?,?,?,?)').run(digest(token), role, owner, classId, number, name, Date.now() + 8 * 3600000);
         res.setHeader('Set-Cookie', `${cookieName}=${token}; Path=/; HttpOnly; SameSite=Strict; Max-Age=28800${secure ? '; Secure' : ''}`);
       };
       if (path === '/api/login' && req.method === 'POST') {
-        limit(`login:${req.socket.remoteAddress}`, 10);
+        limit(`login:${clientIp(req)}`, 10);
         const data = await body(); const password = text(data.password, 200);
-        const matches = data.id ? [db.prepare('SELECT * FROM teachers WHERE id=?').get(text(data.id,80))].filter(Boolean) : db.prepare('SELECT * FROM teachers').all().filter(t=>verifyPassword(password,t.password));
+        const matches = data.id ? [await db.prepare('SELECT * FROM teachers WHERE id=?').get(text(data.id,80))].filter(Boolean) : (await db.prepare('SELECT * FROM teachers').all()).filter(t=>verifyPassword(password,t.password));
         const teacher = matches.length === 1 ? matches[0] : null;
         const id = teacher?.id;
         if (!verifyPassword(password, teacher?.password || dummyHash) || !teacher) throw failure(401, '아이디 또는 비밀번호를 확인하세요.');
-        setSession('teacher', id, null, null, teacher.name); return send(200, { ok: true });
+        await setSession('teacher', id, null, null, teacher.name); return send(200, { ok: true });
       }
       if (path === '/api/password' && req.method === 'POST') {
-        limit(`password:${req.socket.remoteAddress}`, 8);
+        limit(`password:${clientIp(req)}`, 8);
         const data = await body();
         const current = text(data.current, 200);
         const next = text(data.next, 200);
@@ -136,52 +142,52 @@ export function createApp({ db = openStore(resolve(process.env.DATA_DIR || 'data
         if (next.length < 12) throw failure(400, '새 비밀번호는 12자 이상으로 정하세요.');
         if (next !== confirm) throw failure(400, '새 비밀번호가 서로 다릅니다.');
         if (next === current) throw failure(400, '현재 비밀번호와 다른 비밀번호로 정하세요.');
-        const named = data.id ? [db.prepare('SELECT * FROM teachers WHERE id=?').get(text(data.id, 80))].filter(Boolean) : db.prepare('SELECT * FROM teachers').all();
+        const named = data.id ? [await db.prepare('SELECT * FROM teachers WHERE id=?').get(text(data.id, 80))].filter(Boolean) : await db.prepare('SELECT * FROM teachers').all();
         const matches = named.filter(teacher => verifyPassword(current, teacher.password));
         if (matches.length !== 1) {
           verifyPassword(current, dummyHash);
           throw failure(401, '현재 비밀번호를 확인하세요.');
         }
         const teacher = matches[0];
-        if (db.prepare('SELECT * FROM teachers WHERE id<>?').all(teacher.id).some(other => verifyPassword(next, other.password))) throw failure(400, '다른 교사와 같은 비밀번호는 사용할 수 없습니다.');
-        db.prepare('UPDATE teachers SET password=? WHERE id=?').run(hashPassword(next), teacher.id);
-        db.prepare('DELETE FROM sessions WHERE role=? AND owner=?').run('teacher', teacher.id);
+        if ((await db.prepare('SELECT * FROM teachers WHERE id<>?').all(teacher.id)).some(other => verifyPassword(next, other.password))) throw failure(400, '다른 교사와 같은 비밀번호는 사용할 수 없습니다.');
+        await db.prepare('UPDATE teachers SET password=? WHERE id=?').run(hashPassword(next), teacher.id);
+        await db.prepare('DELETE FROM sessions WHERE role=? AND owner=?').run('teacher', teacher.id);
         return send(200, { ok: true });
       }
       if (path === '/api/password/email' && req.method === 'POST') {
-        limit(`password-email:${req.socket.remoteAddress}`, 8);
+        limit(`password-email:${clientIp(req)}`, 8);
         const data = await body();
         const current = text(data.current, 200);
         const email = text(data.email, 120);
         if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw failure(400, '이메일 주소를 확인하세요.');
-        const named = data.id ? [db.prepare('SELECT * FROM teachers WHERE id=?').get(text(data.id, 80))].filter(Boolean) : db.prepare('SELECT * FROM teachers').all();
+        const named = data.id ? [await db.prepare('SELECT * FROM teachers WHERE id=?').get(text(data.id, 80))].filter(Boolean) : await db.prepare('SELECT * FROM teachers').all();
         const matches = named.filter(teacher => verifyPassword(current, teacher.password));
         if (matches.length !== 1) {
           verifyPassword(current, dummyHash);
           throw failure(401, '현재 비밀번호를 확인하세요.');
         }
-        db.prepare('INSERT INTO recovery_emails VALUES (?,?) ON CONFLICT(teacher) DO UPDATE SET email=excluded.email').run(matches[0].id, email);
+        await db.prepare('INSERT INTO recovery_emails VALUES (?,?) ON CONFLICT(teacher) DO UPDATE SET email=excluded.email').run(matches[0].id, email);
         return send(200, { ok: true, to: maskEmail(email) });
       }
       if (path === '/api/password/code' && req.method === 'POST') {
-        limit(`password-code:${req.socket.remoteAddress}`, 3);
+        limit(`password-code:${clientIp(req)}`, 3);
         await body();
-        const saved = db.prepare('SELECT teacher, email FROM recovery_emails').all();
+        const saved = await db.prepare('SELECT teacher, email FROM recovery_emails').all();
         if (saved.length !== 1) throw failure(400, '복구 이메일이 등록되어 있지 않습니다. 현재 비밀번호로 먼저 등록하세요.');
         const code = String(randomInt(0, 1000000)).padStart(6, '0');
         await deliverRecoveryCode(sendMail, { to: saved[0].email, code });
-        db.prepare('INSERT INTO recovery_codes VALUES (?,?,?,?) ON CONFLICT(teacher) DO UPDATE SET hash=excluded.hash, expires=excluded.expires, tries=0').run(saved[0].teacher, createHash('sha256').update(code).digest('hex'), Date.now() + 10 * 60 * 1000, 0);
+        await db.prepare('INSERT INTO recovery_codes VALUES (?,?,?,?) ON CONFLICT(teacher) DO UPDATE SET hash=excluded.hash, expires=excluded.expires, tries=0').run(saved[0].teacher, createHash('sha256').update(code).digest('hex'), Date.now() + 10 * 60 * 1000, 0);
         return send(200, { ok: true, to: maskEmail(saved[0].email) });
       }
       if (path === '/api/password/recover' && req.method === 'POST') {
-        limit(`recover:${req.socket.remoteAddress}`, 8);
+        limit(`recover:${clientIp(req)}`, 8);
         const data = await body();
         const code = text(data.code, 20);
         const next = text(data.next, 200);
         const confirm = text(data.confirm, 200);
         if (next.length < 12) throw failure(400, '새 비밀번호는 12자 이상으로 정하세요.');
         if (next !== confirm) throw failure(400, '새 비밀번호가 서로 다릅니다.');
-        const pending = db.prepare('SELECT * FROM recovery_codes WHERE expires>?').all(Date.now());
+        const pending = await db.prepare('SELECT * FROM recovery_codes WHERE expires>?').all(Date.now());
         if (!pending.length) throw failure(401, '인증 번호가 만료되었습니다. 다시 요청하세요.');
         const digestCode = value => createHash('sha256').update(value).digest();
         const match = pending.find(row => {
@@ -191,46 +197,46 @@ export function createApp({ db = openStore(resolve(process.env.DATA_DIR || 'data
         });
         if (!match) {
           for (const row of pending) {
-            if (row.tries + 1 >= 5) db.prepare('DELETE FROM recovery_codes WHERE teacher=?').run(row.teacher);
-            else db.prepare('UPDATE recovery_codes SET tries=? WHERE teacher=?').run(row.tries + 1, row.teacher);
+            if (row.tries + 1 >= 5) await db.prepare('DELETE FROM recovery_codes WHERE teacher=?').run(row.teacher);
+            else await db.prepare('UPDATE recovery_codes SET tries=? WHERE teacher=?').run(row.tries + 1, row.teacher);
           }
           throw failure(401, '인증 번호가 맞지 않습니다.');
         }
-        const teacher = db.prepare('SELECT * FROM teachers WHERE id=?').get(match.teacher);
+        const teacher = await db.prepare('SELECT * FROM teachers WHERE id=?').get(match.teacher);
         if (!teacher || verifyPassword(next, teacher.password)) throw failure(400, '현재 비밀번호와 다른 비밀번호로 정하세요.');
-        if (db.prepare('SELECT * FROM teachers WHERE id<>?').all(teacher.id).some(other => verifyPassword(next, other.password))) throw failure(400, '다른 교사와 같은 비밀번호는 사용할 수 없습니다.');
-        db.prepare('UPDATE teachers SET password=? WHERE id=?').run(hashPassword(next), teacher.id);
-        db.prepare('DELETE FROM recovery_codes WHERE teacher=?').run(teacher.id);
-        db.prepare('DELETE FROM sessions WHERE role=? AND owner=?').run('teacher', teacher.id);
+        if ((await db.prepare('SELECT * FROM teachers WHERE id<>?').all(teacher.id)).some(other => verifyPassword(next, other.password))) throw failure(400, '다른 교사와 같은 비밀번호는 사용할 수 없습니다.');
+        await db.prepare('UPDATE teachers SET password=? WHERE id=?').run(hashPassword(next), teacher.id);
+        await db.prepare('DELETE FROM recovery_codes WHERE teacher=?').run(teacher.id);
+        await db.prepare('DELETE FROM sessions WHERE role=? AND owner=?').run('teacher', teacher.id);
         return send(200, { ok: true });
       }
       if (path === '/api/join' && req.method === 'POST') {
-        limit(`join:${req.socket.remoteAddress}`, 120);
+        limit(`join:${clientIp(req)}`, 120);
         const data = await body();
         const number = text(data.number, 20); const name = text(data.name, 40);
         if (data.consent !== true) throw failure(400, '수집·이용 동의가 필요합니다.');
-        const matches = studentClassId ? db.prepare('SELECT * FROM roster WHERE number=? AND name=? AND classId=?').all(number,name,studentClassId) : db.prepare('SELECT * FROM roster WHERE number=? AND name=?').all(number,name);
+        const matches = studentClassId ? await db.prepare('SELECT * FROM roster WHERE number=? AND name=? AND classId=?').all(number,name,studentClassId) : await db.prepare('SELECT * FROM roster WHERE number=? AND name=?').all(number,name);
         if (matches.length !== 1) throw failure(400, '학번과 이름이 일치하지 않습니다. 선생님께 등록된 명단을 확인해 주세요.');
         const group = matches[0].classId;
         const owner = session?.role === 'student' && session.classId === group && session.number === number && session.name === name ? session.owner : randomUUID();
-        markAttendance(group, number, 'present');
-        setSession('student', owner, group, number, name); return send(200, { ok: true });
+        await markAttendance(group, number, 'present');
+        await setSession('student', owner, group, number, name); return send(200, { ok: true });
       }
       if (path === '/api/logout' && req.method === 'POST') {
-        if (cookie) db.prepare('DELETE FROM sessions WHERE token=?').run(digest(cookie));
+        if (cookie) await db.prepare('DELETE FROM sessions WHERE token=?').run(digest(cookie));
         res.setHeader('Set-Cookie', `${cookieName}=; Path=/; HttpOnly; SameSite=Strict; Max-Age=0${secure ? '; Secure' : ''}`);
         return send(200, { ok: true });
       }
       if (path === '/api/me' && req.method === 'GET') {
-        auth(); const classes = session.role === 'teacher' ? db.prepare('SELECT c.id,c.name FROM classes c JOIN permissions p ON p.classId=c.id WHERE p.teacher=?').all(session.owner) : [];
+        auth(); const classes = session.role === 'teacher' ? await db.prepare('SELECT c.id,c.name FROM classes c JOIN permissions p ON p.classId=c.id WHERE p.teacher=?').all(session.owner) : [];
         return send(200, { role: session.role, name: session.name, number: session.number, classId: session.classId, classes, preview });
       }
-      if (path === '/api/sheets' && req.method === 'GET') { auth('teacher'); return send(200,sheets.status(session.owner)); }
+      if (path === '/api/sheets' && req.method === 'GET') { auth('teacher'); return send(200, await sheets.status(session.owner)); }
       if (path === '/api/attendance' || path === '/api/roster' || path === '/api/roster/delete') {
         auth('teacher');
         const data = req.method === 'POST' ? await body() : null;
         const classId = text(data?.classId || url.searchParams.get('classId'),80);
-        if (!db.prepare('SELECT 1 FROM permissions WHERE teacher=? AND classId=?').get(session.owner,classId)) throw failure(403,'담당 학급만 확인하거나 수정할 수 있습니다.');
+        if (!await db.prepare('SELECT 1 FROM permissions WHERE teacher=? AND classId=?').get(session.owner,classId)) throw failure(403,'담당 학급만 확인하거나 수정할 수 있습니다.');
         if (path === '/api/roster') {
           if (req.method !== 'POST') throw failure(405,'허용되지 않는 요청입니다.');
           if (!Array.isArray(data.students) || !data.students.length || data.students.length > 400) throw failure(400,'1~400명의 명단을 입력하세요.');
@@ -252,16 +258,14 @@ export function createApp({ db = openStore(resolve(process.env.DATA_DIR || 'data
           };
           const storedConflicts = [];
           for (const row of unique) {
-            const previous = db.prepare('SELECT name FROM roster WHERE classId=? AND number=?').get(classId, row.number);
+            const previous = await db.prepare('SELECT name FROM roster WHERE classId=? AND number=?').get(classId, row.number);
             if (previous && previous.name !== row.name) storedConflicts.push(`${row.number}는 이미 '${previous.name}'${asParticle(previous.name)} 등록되어 있습니다. '${row.name}'${asParticle(row.name)}는 등록할 수 없습니다.`);
           }
           if (storedConflicts.length) throw failure(400, storedConflicts.join('\n'));
-          db.exec('BEGIN');
-          try {
-            const save = db.prepare('INSERT INTO roster VALUES (?,?,?) ON CONFLICT(classId,number) DO NOTHING');
-            for (const row of unique) save.run(classId, row.number, row.name);
-            db.exec('COMMIT');
-          } catch(error) { db.exec('ROLLBACK'); throw error; }
+          await db.transaction(async tx => {
+            const save = tx.prepare('INSERT INTO roster VALUES (?,?,?) ON CONFLICT(classId,number) DO NOTHING');
+            for (const row of unique) await save.run(classId, row.number, row.name);
+          });
           return send(200,{ok:true});
         }
         if (path === '/api/roster/delete') {
@@ -290,7 +294,7 @@ export function createApp({ db = openStore(resolve(process.env.DATA_DIR || 'data
           const missing = [];
           const targets = [];
           for (const [number, names] of byNumber) {
-            const previous = db.prepare('SELECT name FROM roster WHERE classId=? AND number=?').get(classId, number);
+            const previous = await db.prepare('SELECT name FROM roster WHERE classId=? AND number=?').get(classId, number);
             const name = [...names][0] || '';
             if (!previous) missing.push(number);
             else if (name && name !== previous.name) mismatches.push(`${number}는 이미 '${previous.name}'${asParticle(previous.name)} 등록되어 있습니다. '${name}'${asParticle(name)}는 삭제할 수 없습니다.`);
@@ -298,23 +302,21 @@ export function createApp({ db = openStore(resolve(process.env.DATA_DIR || 'data
           }
           if (mismatches.length) throw failure(400, mismatches.join('\n'));
           if (missing.length) throw failure(400, `명단에 없는 학번입니다: ${missing.join(', ')}. 삭제할 수 없습니다.`);
-          db.exec('BEGIN');
-          try {
-            const dropAttendance = db.prepare('DELETE FROM attendance WHERE classId=? AND number=?');
-            const dropRoster = db.prepare('DELETE FROM roster WHERE classId=? AND number=?');
-            for (const number of targets) { dropAttendance.run(classId, number); dropRoster.run(classId, number); }
-            db.exec('COMMIT');
-          } catch(error) { db.exec('ROLLBACK'); throw error; }
+          await db.transaction(async tx => {
+            const dropAttendance = tx.prepare('DELETE FROM attendance WHERE classId=? AND number=?');
+            const dropRoster = tx.prepare('DELETE FROM roster WHERE classId=? AND number=?');
+            for (const number of targets) { await dropAttendance.run(classId, number); await dropRoster.run(classId, number); }
+          });
           return send(200,{ok:true,removed:targets.length});
         }
         if (data) {
           const number = text(data.number,20), name = text(data.name,40);
           if (!['present','absent'].includes(data.status)) throw failure(400,'출결 상황을 선택하세요.');
-          if (!db.prepare('SELECT 1 FROM roster WHERE classId=? AND number=? AND name=?').get(classId,number,name)) throw failure(400,'학번과 이름이 일치하지 않습니다.');
-          markAttendance(classId,number,data.status);
+          if (!await db.prepare('SELECT 1 FROM roster WHERE classId=? AND number=? AND name=?').get(classId,number,name)) throw failure(400,'학번과 이름이 일치하지 않습니다.');
+          await markAttendance(classId,number,data.status);
         }
         const day = schoolDay();
-        const rows = db.prepare("SELECT r.number,r.name,COALESCE(a.status,'absent') status FROM roster r LEFT JOIN attendance a ON a.classId=r.classId AND a.number=r.number AND a.day=? WHERE r.classId=? ORDER BY r.number").all(day,classId);
+        const rows = await db.prepare("SELECT r.number,r.name,COALESCE(a.status,'absent') status FROM roster r LEFT JOIN attendance a ON a.classId=r.classId AND a.number=r.number AND a.day=? WHERE r.classId=? ORDER BY r.number").all(day,classId);
         return send(200,{day,rows,total:rows.length,present:rows.filter(r=>r.status==='present').length});
       }
       if (path === '/api/reading' && req.method === 'POST') {
@@ -330,7 +332,7 @@ export function createApp({ db = openStore(resolve(process.env.DATA_DIR || 'data
         auth('student'); limit(`submit:${session.owner}`, 20);
         const data = await body(); const id = text(data.id, 80);
         if (!/^[a-f0-9-]{36}$/.test(id)) throw failure(400, '잘못된 기록 ID입니다.');
-        const existing = db.prepare('SELECT id,score,passed,heard FROM attempts WHERE id=? AND owner=?').get(id, session.owner);
+        const existing = await db.prepare('SELECT id,score,passed,heard FROM attempts WHERE id=? AND owner=?').get(id, session.owner);
         if (existing) return send(200, existing);
         const lesson = findLesson(data.lesson);
         if (!lesson || typeof data.heard !== 'string' || data.heard.length > 500) throw failure(400, '잘못된 연습 내용입니다.');
@@ -338,7 +340,7 @@ export function createApp({ db = openStore(resolve(process.env.DATA_DIR || 'data
         if (heard === null) throw failure(422, '일본어 발음을 읽어내지 못했어요. 다시 읽어 주세요.');
         const score = heard ? assess(lesson.reading, heard, lesson.ruby || '').score : null;
         const passed = score === null ? null : Number(score >= PASS_THRESHOLD);
-        db.prepare('INSERT INTO attempts VALUES (?,?,?,?,?,?,?,?,?,?,?)').run(id,session.owner,session.classId,session.number,session.name,lesson.id,lesson.reading,heard,score,passed,new Date().toISOString());
+        await db.prepare('INSERT INTO attempts VALUES (?,?,?,?,?,?,?,?,?,?,?)').run(id,session.owner,session.classId,session.number,session.name,lesson.id,lesson.reading,heard,score,passed,new Date().toISOString());
         void sheets.flush();
         return send(201, { id, score, passed, heard });
       }
@@ -347,7 +349,7 @@ export function createApp({ db = openStore(resolve(process.env.DATA_DIR || 'data
         const access = scope(); if (path === '/api/export') auth('teacher');
         const conditions = [access.sql]; const args = [access.value];
         for (const key of ['classId', 'number']) if (url.searchParams.get(key)) { conditions.push(`${key}=?`); args.push(url.searchParams.get(key)); }
-        const rows = db.prepare(`SELECT id,classId,number,name,lesson,target,heard,score,passed,at FROM attempts WHERE ${conditions.join(' AND ')} ORDER BY at DESC`).all(...args);
+        const rows = await db.prepare(`SELECT id,classId,number,name,lesson,target,heard,score,passed,at FROM attempts WHERE ${conditions.join(' AND ')} ORDER BY at DESC`).all(...args);
         if (path === '/api/export') {
           res.setHeader('Content-Disposition', 'attachment; filename="kanasori-results.csv"');
           const values = [['학급','학번','이름','목표 글자','인식된 말','일치율','판정','기준','일시(UTC)','기록 ID'], ...rows.map(r => [r.classId,r.number,r.name,r.target,r.heard,r.score,r.score === null ? '판정 대기' : r.passed ? '통과' : '재연습',PASS_THRESHOLD,r.at,r.id])];
@@ -361,10 +363,11 @@ export function createApp({ db = openStore(resolve(process.env.DATA_DIR || 'data
       if (!error.status) console.error(error);
       send(error.status || 500, { error: error.status ? error.message : '저장에 실패했습니다. 잠시 후 다시 시도하세요.' });
     }
-  });
+  };
+  const server = createServer(handle);
   server.on('listening',()=>sheets.start());
   server.on('close',()=>sheets.close());
-  return { server, db }; 
+  return { server, db, handle, sheets }; 
 }
 if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   if (process.env.NODE_ENV === 'production' && !process.env.APP_ORIGIN?.startsWith('https://')) throw new Error('운영 환경에서는 HTTPS APP_ORIGIN이 필요합니다.');

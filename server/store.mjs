@@ -2,6 +2,9 @@ import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
+import postgres from 'postgres';
+import { rewriteSql } from './sql.mjs';
+import { SCHEMA_STATEMENTS, TABLES } from './schema.mjs';
 
 export function hashPassword(password) {
   const salt = randomBytes(16).toString('hex');
@@ -12,6 +15,7 @@ export function verifyPassword(password, hash) {
   return timingSafeEqual(scryptSync(password, salt, 32), Buffer.from(expected, 'hex'));
 }
 export function openStore(path) {
+  if (path !== ':memory:' && process.env.DATABASE_URL) return openPostgres(process.env.DATABASE_URL);
   if (path !== ':memory:') mkdirSync(dirname(path), { recursive: true });
   const db = new DatabaseSync(path);
   db.exec(`PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;
@@ -26,6 +30,82 @@ export function openStore(path) {
     CREATE INDEX IF NOT EXISTS attempts_owner ON attempts(owner);
     CREATE TABLE IF NOT EXISTS recovery_emails (teacher TEXT PRIMARY KEY REFERENCES teachers(id), email TEXT NOT NULL);
     CREATE TABLE IF NOT EXISTS recovery_codes (teacher TEXT PRIMARY KEY REFERENCES teachers(id), hash TEXT NOT NULL, expires INTEGER NOT NULL, tries INTEGER NOT NULL);
+    CREATE TABLE IF NOT EXISTS sheet_receipts (id TEXT PRIMARY KEY REFERENCES attempts(id), sentAt TEXT NOT NULL);
   `);
-  return db;
+  return wrapSqlite(db);
+}
+
+function wrapSqlite(db) {
+  const store = {
+    prepare: sql => db.prepare(sql),
+    exec: sql => db.exec(sql),
+    close: () => db.close(),
+    async transaction(fn) {
+      db.exec('BEGIN');
+      try {
+        const result = await fn(store);
+        db.exec('COMMIT');
+        return result;
+      } catch (error) {
+        db.exec('ROLLBACK');
+        throw error;
+      }
+    },
+  };
+  return store;
+}
+
+function wrapPostgres(sql, { end } = {}) {
+  const store = {
+    prepare(text) {
+      const query = rewriteSql(text);
+      return {
+        async get(...args) {
+          const rows = await sql.unsafe(query, args);
+          return rows[0];
+        },
+        async all(...args) {
+          return await sql.unsafe(query, args);
+        },
+        async run(...args) {
+          await sql.unsafe(query, args);
+        },
+      };
+    },
+    async exec(text) {
+      for (const part of text.split(';').map(item => item.trim()).filter(Boolean)) await sql.unsafe(rewriteSql(part));
+    },
+    async transaction(fn) {
+      return sql.begin(async tx => fn(wrapPostgres(tx)));
+    },
+    async close() {
+      if (end) await end();
+    },
+  };
+  return store;
+}
+
+export function openPostgres(databaseUrl) {
+  const sql = postgres(databaseUrl, {
+    max: 1,
+    prepare: false,
+    idle_timeout: 20,
+    connect_timeout: 15,
+    ssl: /localhost|127\.0\.0\.1/.test(databaseUrl) ? false : 'require',
+  });
+  const store = wrapPostgres(sql, { end: () => sql.end({ timeout: 5 }) });
+  store.ready = migrate(sql);
+  return store;
+}
+
+async function migrate(sql) {
+  for (const statement of SCHEMA_STATEMENTS) await sql.unsafe(statement);
+  for (const table of TABLES) {
+    await sql.unsafe(`ALTER TABLE ${table} ENABLE ROW LEVEL SECURITY`);
+    try {
+      await sql.unsafe(`REVOKE ALL ON TABLE ${table} FROM anon, authenticated`);
+    } catch (error) {
+      if (error.code !== '42704') throw error;
+    }
+  }
 }

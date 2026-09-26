@@ -4,17 +4,18 @@ import { PASS_THRESHOLD } from '../js/lessons.js';
 export function createSheetsSync(db, { url = '', token = '', preview = false, fetcher = fetch } = {}) {
   if (url && !/^https:\/\/script\.google\.com\/macros\/s\/[\w-]+\/exec$/.test(url)) throw new Error('SHEETS_WEB_APP_URL must be a Google Apps Script /exec URL');
   const enabled = Boolean(url && token && !preview);
-  db.exec('CREATE TABLE IF NOT EXISTS sheet_receipts (id TEXT PRIMARY KEY REFERENCES attempts(id), sentAt TEXT NOT NULL)');
   let running = null, failed = false, closed = false;
-  function status(teacher) {
-    const counts = db.prepare(`SELECT COUNT(*) total, COUNT(s.id) sent FROM attempts a LEFT JOIN sheet_receipts s ON s.id=a.id WHERE a.classId IN (SELECT classId FROM permissions WHERE teacher=?)`).get(teacher);
-    return { enabled, preview, total: counts.total, sent: counts.sent, pending: counts.total-counts.sent, failed: enabled && failed };
+  async function status(teacher) {
+    const counts = await db.prepare(`SELECT COUNT(*) total, COUNT(s.id) sent FROM attempts a LEFT JOIN sheet_receipts s ON s.id=a.id WHERE a.classId IN (SELECT classId FROM permissions WHERE teacher=?)`).get(teacher);
+    const total = Number(counts.total);
+    const sent = Number(counts.sent);
+    return { enabled, preview, total, sent, pending: total - sent, failed: enabled && failed };
   }
   function flush() {
     if (!enabled || closed) return Promise.resolve();
     if (running) return running;
     running = (async () => {
-      const rows = db.prepare(`SELECT a.*, c.name className FROM attempts a JOIN classes c ON c.id=a.classId LEFT JOIN sheet_receipts s ON s.id=a.id WHERE s.id IS NULL ORDER BY a.at LIMIT 50`).all();
+      const rows = await db.prepare(`SELECT a.*, c.name className FROM attempts a JOIN classes c ON c.id=a.classId LEFT JOIN sheet_receipts s ON s.id=a.id WHERE s.id IS NULL ORDER BY a.at LIMIT 50`).all();
       for (const row of rows) {
         if (closed) break;
         try {
@@ -24,7 +25,7 @@ export function createSheetsSync(db, { url = '', token = '', preview = false, fe
           const ack = await response.json();
           if (ack.ok !== true || ack.id !== row.id) throw new Error('Missing acknowledgement');
           if (closed) break;
-          db.prepare('INSERT OR IGNORE INTO sheet_receipts VALUES (?,?)').run(row.id,new Date().toISOString());
+          await db.prepare('INSERT INTO sheet_receipts (id, sentAt) VALUES (?,?) ON CONFLICT(id) DO NOTHING').run(row.id, new Date().toISOString());
           failed = false;
         } catch { failed = true; break; }
       }

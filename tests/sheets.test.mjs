@@ -11,10 +11,10 @@ test('sheet delivery retries failures, acknowledges IDs and survives worker rest
   return Response.json(bad?{ok:false}:{ok:true,id:body.record.id});
  }};
  const sync=createSheetsSync(db,options);
- await sync.flush(); assert.equal(sync.status('t').pending,1); assert.equal(sync.status('t').failed,true);
- bad=false; await Promise.all([sync.flush(),sync.flush()]); assert.equal(calls,2);assert.equal(sync.status('t').sent,1);
+ await sync.flush(); assert.equal((await sync.status('t')).pending,1); assert.equal((await sync.status('t')).failed,true);
+ bad=false; await Promise.all([sync.flush(),sync.flush()]); assert.equal(calls,2);assert.equal((await sync.status('t')).sent,1);
  sync.close(); const restarted=createSheetsSync(db,options);await restarted.flush();assert.equal(calls,2);
- assert.equal(restarted.status('other').total,0);restarted.close();
+ assert.equal((await restarted.status('other')).total,0);restarted.close();
  db.exec('DELETE FROM sheet_receipts');
  const preview=createSheetsSync(db,{...options,preview:true});await preview.flush();assert.equal(calls,2);preview.close();db.close();
 });

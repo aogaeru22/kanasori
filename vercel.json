@@ -1,0 +1,19 @@
+{
+  "regions": ["icn1"],
+  "functions": {
+    "api/[...path].mjs": {
+      "maxDuration": 60,
+      "includeFiles": "node_modules/kuromoji/dict/**"
+    },
+    "api/cron/sheets.mjs": {
+      "maxDuration": 60,
+      "includeFiles": "node_modules/kuromoji/dict/**"
+    }
+  },
+  "crons": [
+    {
+      "path": "/api/cron/sheets",
+      "schedule": "0 15 * * *"
+    }
+  ]
+}

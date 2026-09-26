@@ -51,32 +51,46 @@ Remove-Item Env:SETUP_SECRET
 
 `npm run preview`로 3학년 10개 반의 로컬 체험 화면을 실행할 수 있습니다. 주소는 `http://127.0.0.1:5512/teacher.html`, 계정은 `demo` / `local-demo-password`입니다. 미리보기는 메모리 DB만 사용하며 재시작하면 빈 명단으로 돌아옵니다. 운영 DB와는 분리됩니다.
 
-- 저장 위치: `data/kanasori.sqlite`. `DATA_DIR`로 다른 영구 저장 디렉터리를 지정할 수 있습니다. 서버와 관리자 명령은 같은 `DATA_DIR`을 사용해야 합니다.
+- 저장 위치: `DATABASE_URL`이 있으면 Supabase Postgres입니다. 없으면 `data/kanasori.sqlite`입니다. `DATA_DIR`로 SQLite 디렉터리를 바꿀 수 있습니다. 서버와 관리자 명령은 같은 저장소를 사용해야 합니다.
 - 저장 항목: 등록 학생 명단, 날짜별 출결 상태와 변경 시각, 학급, 학번, 이름, 연습 항목, 목표 글자, 인식된 말, 점수, 통과 여부, 서버 기록 시각, 세션 소유자 식별자 및 중복 방지 ID.
 - 점수는 서버가 공통 `assess` 함수로 다시 계산하며 통과 기준은 70%입니다. 학생이 보낸 점수·학번·학급은 신뢰하지 않습니다. 대상 행은 서버의 가나 목록에서 결정됩니다.
 - 브라우저가 인식한 문자에 대한 연습용 평가입니다. 녹음 음원의 음향 분석이나 억양·장단음의 정밀 발음 평가가 아닙니다. 브라우저 음성 인식에서 음성이 제공업체 서버로 전송될 수 있습니다.
 - 연습 도중 행 변경을 막고 저장 성공을 확인한 뒤 다음 연습을 허용합니다. 실패 시 같은 ID로 재시도해 중복 저장을 방지합니다. 페이지를 닫기 전 미저장 결과를 안내합니다.
 - 교사 화면에서 학급/학번을 선택하거나 학생 이름을 눌러 결과를 필터링합니다. CSV에도 같은 필터와 서버 권한 검사가 적용됩니다. CSV는 UTF-8 BOM 및 수식 주입 방지 처리를 포함합니다.
-- 결과는 먼저 `/api/attempts`로 영구 DB에 저장합니다. 구글 시트 연동 설정 후에는 서버가 30초마다 미전송 기록을 보내며 기록 ID로 중복을 방지합니다. 미리보기에서는 전송하지 않습니다.
+- 결과는 먼저 `/api/attempts`로 영구 DB에 저장합니다. 구글 시트 연동 설정 후에는 로컬 서버가 30초마다, Vercel에서는 저장 직후와 예약 작업에서 미전송 기록을 보내며 기록 ID로 중복을 방지합니다. 미리보기에서는 전송하지 않습니다.
 
 ## 운영 배포
 
-단일 Node 프로세스와 영구 디스크가 있는 서버에 배포하는 구성입니다. Vercel 정적 배포나 일시적인 서버리스 파일시스템에 SQLite를 올리는 구성은 지원하지 않습니다. 해당 환경에서는 별도 영구 DB 연결이 필요합니다.
+수업용 주소는 Vercel이 만들고, 학번·출석·점수는 Supabase에 저장합니다. 학생 화면은 Supabase에 직접 접속하지 않습니다. 연결 문자열은 Vercel 환경변수에만 둡니다.
 
-리버스 프록시에서 HTTPS를 설정하고 아래 환경변수를 지정합니다.
+1. Supabase에서 프로젝트를 만듭니다. 지역은 Northeast Asia (Seoul)이 교실과 가깝습니다.
+2. Project Settings → Database → Connection string에서 **Transaction pooler** URI를 복사합니다. 포트는 6543입니다. 비밀번호에 `@`, `#` 같은 기호가 있으면 URL 인코딩이 필요합니다.
+3. Vercel에 이 저장소를 프로젝트로 연결하고 환경변수를 넣습니다.
 
 ```text
-NODE_ENV=production
-APP_ORIGIN=https://실제-서비스-도메인
-HOST=0.0.0.0
-PORT=5500
-STUDENT_CLASS_ID=class-301
-DATA_DIR=/영구저장경로/kanasori
+DATABASE_URL=postgresql://postgres.프로젝트:비밀번호@....pooler.supabase.com:6543/postgres
+APP_ORIGIN=https://프로젝트이름.vercel.app
+CRON_SECRET=긴-임의의-문자열
 ```
 
-`APP_ORIGIN`은 끝에 `/` 없이 실제 접속 origin과 같아야 합니다. 운영 모드는 HTTPS origin이 없으면 시작하지 않으며 세션 쿠키에 Secure를 설정합니다. 브라우저의 마이크는 HTTPS 또는 localhost에서 사용하세요. 음성 인식과 Ruffle 학습 자료에는 인터넷 연결이 필요합니다.
+`APP_ORIGIN`은 끝에 `/` 없이, 크롬북이 여는 주소와 같아야 합니다. 배포 후 주소가 정해지면 그 값으로 다시 배포합니다. 표는 첫 요청 때 만들어지고, 외부 키로는 학생 기록을 읽지 못하도록 잠급니다.
 
-운영 전 학교에서 결과 보관 기간과 문의처를 결정하고 시작 화면 개인정보 안내를 갱신하세요. 현재 자동 파기 작업은 없으므로 운영자가 정한 보관 기간에 따라 삭제·백업을 관리해야 합니다. SQLite 백업은 서버를 멈춘 후 데이터 디렉터리 전체를 복사하거나 SQLite의 온라인 백업 기능을 사용하세요. 실제 교사 계정 설정과 외부 서비스 배포는 아직 수행하지 않았습니다.
+4. 학급과 교사는 로컬에서 같은 `DATABASE_URL`로 만듭니다.
+
+```powershell
+$env:DATABASE_URL = '위에서-복사한-연결-문자열'
+node server/setup-grade3.mjs
+$env:SETUP_SECRET = '교사-비밀번호-12자-이상'
+node server/admin.mjs teacher teacher-kim "김 선생님" class-301 class-302
+Remove-Item Env:DATABASE_URL
+Remove-Item Env:SETUP_SECRET
+```
+
+5. 교사 화면에서 명단을 등록한 뒤, 크롬북으로 `APP_ORIGIN` 주소에 접속해 입장과 점수 저장을 확인합니다.
+
+`DATABASE_URL` 없이 `npm start`하면 예전처럼 이 PC의 SQLite로 동작합니다. 마이크는 HTTPS 주소 또는 localhost에서 사용하세요. 음성 인식과 Ruffle 학습 자료에는 인터넷 연결이 필요합니다.
+
+운영 전 학교에서 결과 보관 기간과 문의처를 결정하고 시작 화면 개인정보 안내를 갱신하세요. 현재 자동 파기 작업은 없으므로 운영자가 정한 보관 기간에 따라 Supabase에서 삭제·백업을 관리해야 합니다.
 
 ## 검증
 
