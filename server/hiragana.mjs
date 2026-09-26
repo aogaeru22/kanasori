@@ -1,4 +1,3 @@
-import kuromoji from 'kuromoji';
 import { createRequire } from 'node:module';
 import { dirname, resolve } from 'node:path';
 import { applyReadings, readingPairs } from '../js/score.js';
@@ -13,6 +12,7 @@ function tokenizer() {
   return tokenizerPromise ??= new Promise((resolvePromise, reject) => {
     let dicPath;
     try { dicPath = dictionary(); } catch (error) { reject(error); return; }
+    const kuromoji = require('kuromoji');
     kuromoji.builder({ dicPath }).build((error, value) => {
       if (error) { tokenizerPromise = null; reject(error); }
       else resolvePromise(value);

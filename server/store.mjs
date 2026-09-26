@@ -2,7 +2,6 @@ import { mkdirSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { dirname } from 'node:path';
 import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
-import postgres from 'postgres';
 import { rewriteSql } from './sql.mjs';
 import { SCHEMA_STATEMENTS, TABLES } from './schema.mjs';
 
@@ -96,6 +95,7 @@ function wrapPostgres(sql, { end } = {}) {
 export function openPostgres(databaseUrl) {
   let sql;
   try {
+    const postgres = require('postgres');
     sql = postgres(databaseUrl, {
       max: 1,
       prepare: false,
