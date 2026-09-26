@@ -4,7 +4,7 @@ import { once } from 'node:events';
 import { randomUUID } from 'node:crypto';
 import { WORD_TARGETS, wordTarget } from '../js/word-targets.js';
 import { assess } from '../js/score.js';
-import { createApp } from '../server.mjs';
+import { createApp } from '../classroom-server.mjs';
 import { openStore, hashPassword } from '../server/store.mjs';
 
 test('all 46 visible words have distinct, bounded selectable circles', () => {

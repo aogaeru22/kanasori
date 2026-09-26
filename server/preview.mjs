@@ -1,5 +1,5 @@
 // Local preview: empty grade-three classes; never exported to Google Sheets.
-import {createApp} from '../server.mjs';
+import {createApp} from '../classroom-server.mjs';
 import {openStore,hashPassword} from './store.mjs';
 if(process.env.NODE_ENV==='production') throw new Error('미리보기는 로컬 환경에서만 실행하세요.');
 const db=openStore(':memory:');

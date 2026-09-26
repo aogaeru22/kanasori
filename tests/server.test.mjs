@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
 import { randomUUID } from 'node:crypto';
-import { createApp, csvCell } from '../server.mjs';
+import { createApp, csvCell } from '../classroom-server.mjs';
 import { openStore, hashPassword } from '../server/store.mjs';
 
 test('student assessment, teacher password access, class isolation and CSV', async t => {
@@ -73,7 +73,7 @@ test('student assessment, teacher password access, class isolation and CSV', asy
   assert.match(csv, /'\=HYPERLINK/); assert.match(csv,/통과/); assert.doesNotMatch(csv,/다른 학급/); assert.doesNotMatch(csv,/두번째 학생/);
   assert.equal((await call('/api/attempts/'+id+'/audio',undefined,teacherA)).status,404);
   assert.ok(!db.prepare('PRAGMA table_info(attempts)').all().some(column => ['audio','mime'].includes(column.name)));
-  for (const path of ['/data/kanasori.sqlite','/server.mjs','/server/store.mjs','/.env','/package.json','/gas/Code.gs']) assert.equal((await call(path)).status,404,path);
+  for (const path of ['/data/kanasori.sqlite','/server.mjs','/classroom-server.mjs','/server/store.mjs','/.env','/package.json','/gas/Code.gs']) assert.equal((await call(path)).status,404,path);
   for (const path of ['/','/teacher.html','/results.html','/js/practice.js','/kana/play.html']) assert.equal((await call(path)).status,200,path);
   const combined = a + '; ' + teacherA;
   assert.equal((await (await call('/api/me',undefined,combined)).json()).role,'student');

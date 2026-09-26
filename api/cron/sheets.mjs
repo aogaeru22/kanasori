@@ -1,4 +1,4 @@
-import { createApp } from '../../server.mjs';
+import { createApp } from '../../classroom-server.mjs';
 
 let app;
 

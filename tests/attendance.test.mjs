@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { once } from 'node:events';
-import { createApp } from '../server.mjs';
+import { createApp } from '../classroom-server.mjs';
 import { openStore, hashPassword } from '../server/store.mjs';
 
 test('roster validation, daily attendance, manual corrections and teacher isolation', async t => {

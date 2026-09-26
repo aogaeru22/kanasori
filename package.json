@@ -4,7 +4,7 @@
   "type": "module",
   "main": "server.js",
   "scripts": {
-    "start": "node --env-file-if-exists=.env server.mjs",
+    "start": "node --env-file-if-exists=.env classroom-server.mjs",
     "preview": "node server/preview.mjs",
     "test": "node tests/score.test.mjs && node --test tests/sql.test.mjs tests/server.test.mjs tests/practice.test.mjs tests/learning-summary.test.mjs tests/silence-monitor.test.mjs tests/word-targets.test.mjs tests/hiragana.test.mjs tests/attendance.test.mjs tests/recognition-coverage.test.mjs tests/sheets.test.mjs tests/sheets-receiver.test.mjs",
     "setup:grade3": "node server/setup-grade3.mjs"
