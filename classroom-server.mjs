@@ -39,6 +39,10 @@ async function deliverRecoveryCode(sendMail, message) {
 }
 const digest = value => createHash('sha256').update(value).digest('hex');
 const failure = (status, message) => Object.assign(new Error(message), { status });
+function safeStoreReason(error) {
+  const code = String(error?.code || error?.errors?.[0]?.code || '');
+  return /^[A-Za-z0-9_]{1,16}$/.test(code) ? code : 'unknown';
+}
 function clientIp(req) {
   const forwarded = req.headers['x-forwarded-for'];
   if (typeof forwarded === 'string' && forwarded.trim()) return forwarded.split(',')[0].trim();
@@ -78,7 +82,7 @@ export function createApp({ db = openStore(resolve(process.env.DATA_DIR || 'data
       let path = decodeURIComponent(url.pathname);
       if (path.startsWith('/api/')) {
         if (db.ready) await db.ready;
-        if (db.readyError) throw failure(500, '기록 저장소에 연결하지 못했습니다. 연결 주소를 확인하세요.');
+        if (db.readyError) throw Object.assign(failure(500, '기록 저장소에 연결하지 못했습니다. 연결 주소를 확인하세요.'), { reason: safeStoreReason(db.readyError) });
       }
       if (!path.startsWith('/api/')) {
         if (!['GET', 'HEAD'].includes(req.method)) throw failure(405, '허용되지 않는 요청입니다.');
@@ -364,7 +368,7 @@ export function createApp({ db = openStore(resolve(process.env.DATA_DIR || 'data
     } catch (error) {
       if (res.headersSent) { res.end(); return; }
       if (!error.status) console.error(error);
-      send(error.status || 500, { error: error.status ? error.message : '저장에 실패했습니다. 잠시 후 다시 시도하세요.' });
+      send(error.status || 500, { error: error.status ? error.message : '저장에 실패했습니다. 잠시 후 다시 시도하세요.', ...(error.reason ? { reason: error.reason } : {}) });
     }
   };
   const server = createServer(handle);
