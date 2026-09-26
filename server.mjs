@@ -74,9 +74,12 @@ export function createApp({ db = openStore(resolve(process.env.DATA_DIR || 'data
       res.end(type.startsWith('application/json') ? JSON.stringify(data) : data);
     };
     try {
-      if (db.ready) await db.ready;
       const url = new URL(req.url, 'http://localhost');
       let path = decodeURIComponent(url.pathname);
+      if (path.startsWith('/api/')) {
+        if (db.ready) await db.ready;
+        if (db.readyError) throw failure(500, '기록 저장소에 연결하지 못했습니다. 연결 주소를 확인하세요.');
+      }
       if (!path.startsWith('/api/')) {
         if (!['GET', 'HEAD'].includes(req.method)) throw failure(405, '허용되지 않는 요청입니다.');
         const relative = path === '/' ? 'index.html' : path.slice(1);
@@ -371,9 +374,17 @@ export function createApp({ db = openStore(resolve(process.env.DATA_DIR || 'data
 }
 const isDirectRun = process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url);
 if (isDirectRun || process.env.VERCEL) {
-  if (process.env.NODE_ENV === 'production' && !process.env.APP_ORIGIN?.startsWith('https://')) throw new Error('운영 환경에서는 HTTPS APP_ORIGIN이 필요합니다.');
-  const { server } = createApp();
   const port = Number(process.env.PORT || 5500);
   const host = process.env.VERCEL ? '0.0.0.0' : (process.env.HOST || '127.0.0.1');
-  server.listen(port, host, () => console.log(`かな소리: http://${host}:${port}`));
+  try {
+    if (process.env.NODE_ENV === 'production' && !process.env.APP_ORIGIN?.startsWith('https://')) throw new Error('운영 환경에서는 HTTPS APP_ORIGIN이 필요합니다.');
+    const { server } = createApp();
+    server.listen(port, host, () => console.log(`かな소리: http://${host}:${port}`));
+  } catch (error) {
+    console.error(error);
+    createServer((req, res) => {
+      res.writeHead(500, { 'Content-Type': 'text/plain; charset=utf-8' });
+      res.end('앱을 시작하지 못했습니다. 연결 주소를 확인하세요.');
+    }).listen(port, host);
+  }
 }

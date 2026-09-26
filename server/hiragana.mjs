@@ -5,13 +5,17 @@ import { applyReadings, readingPairs } from '../js/score.js';
 import { hiraganaScript, expandLongVowels, promptedReading } from '../js/kana.js';
 
 const require = createRequire(import.meta.url);
-const dictionary = resolve(dirname(require.resolve('kuromoji/package.json')), 'dict');
 let tokenizerPromise;
+function dictionary() {
+  return resolve(dirname(require.resolve('kuromoji/package.json')), 'dict');
+}
 function tokenizer() {
-  return tokenizerPromise ??= new Promise((resolve, reject) => {
-    kuromoji.builder({ dicPath: dictionary }).build((error, value) => {
+  return tokenizerPromise ??= new Promise((resolvePromise, reject) => {
+    let dicPath;
+    try { dicPath = dictionary(); } catch (error) { reject(error); return; }
+    kuromoji.builder({ dicPath }).build((error, value) => {
       if (error) { tokenizerPromise = null; reject(error); }
-      else resolve(value);
+      else resolvePromise(value);
     });
   });
 }

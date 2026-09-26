@@ -1,10 +1,12 @@
-import { DatabaseSync } from 'node:sqlite';
 import { mkdirSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { dirname } from 'node:path';
 import { randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
 import postgres from 'postgres';
 import { rewriteSql } from './sql.mjs';
 import { SCHEMA_STATEMENTS, TABLES } from './schema.mjs';
+
+const require = createRequire(import.meta.url);
 
 export function hashPassword(password) {
   const salt = randomBytes(16).toString('hex');
@@ -17,6 +19,11 @@ export function verifyPassword(password, hash) {
 export function openStore(path) {
   const databaseUrl = process.env.DATABASE_URL?.trim();
   if (path !== ':memory:' && databaseUrl) return openPostgres(databaseUrl);
+  return openSqlite(path);
+}
+
+function openSqlite(path) {
+  const { DatabaseSync } = require('node:sqlite');
   if (path !== ':memory:') mkdirSync(dirname(path), { recursive: true });
   const db = new DatabaseSync(path);
   db.exec(`PRAGMA journal_mode=WAL; PRAGMA foreign_keys=ON;
@@ -87,16 +94,37 @@ function wrapPostgres(sql, { end } = {}) {
 }
 
 export function openPostgres(databaseUrl) {
-  const sql = postgres(databaseUrl, {
-    max: 1,
-    prepare: false,
-    idle_timeout: 20,
-    connect_timeout: 15,
-    ssl: /localhost|127\.0\.0\.1/.test(databaseUrl) ? false : 'require',
-  });
+  let sql;
+  try {
+    sql = postgres(databaseUrl, {
+      max: 1,
+      prepare: false,
+      idle_timeout: 20,
+      connect_timeout: 15,
+      ssl: /localhost|127\.0\.0\.1/.test(databaseUrl) ? false : 'require',
+    });
+  } catch (error) {
+    console.error(error);
+    return brokenStore(error);
+  }
   const store = wrapPostgres(sql, { end: () => sql.end({ timeout: 5 }) });
-  store.ready = migrate(sql);
+  store.ready = migrate(sql).catch(error => {
+    console.error(error);
+    store.readyError = error;
+  });
   return store;
+}
+
+function brokenStore(error) {
+  const fail = async () => { throw error; };
+  return {
+    prepare() { return { get: fail, all: fail, run: fail }; },
+    exec: fail,
+    transaction: fail,
+    async close() {},
+    ready: Promise.resolve(),
+    readyError: error,
+  };
 }
 
 async function migrate(sql) {
