@@ -24,6 +24,8 @@ export function openStore(path) {
     CREATE TABLE IF NOT EXISTS attendance (classId TEXT, number TEXT, day TEXT, status TEXT NOT NULL CHECK(status IN ('present','absent')), updated TEXT NOT NULL, PRIMARY KEY(classId,number,day), FOREIGN KEY(classId,number) REFERENCES roster(classId,number));
     CREATE INDEX IF NOT EXISTS attempts_class ON attempts(classId,at);
     CREATE INDEX IF NOT EXISTS attempts_owner ON attempts(owner);
+    CREATE TABLE IF NOT EXISTS recovery_emails (teacher TEXT PRIMARY KEY REFERENCES teachers(id), email TEXT NOT NULL);
+    CREATE TABLE IF NOT EXISTS recovery_codes (teacher TEXT PRIMARY KEY REFERENCES teachers(id), hash TEXT NOT NULL, expires INTEGER NOT NULL, tries INTEGER NOT NULL);
   `);
   return db;
 }

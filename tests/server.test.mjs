@@ -13,7 +13,8 @@ test('student assessment, teacher password access, class isolation and CSV', asy
     db.prepare('INSERT INTO permissions VALUES (?,?)').run(id,id);
   }
   for(const row of [['a','1','학생'],['a','30101','=HYPERLINK("bad")'],['a','30102','두번째 학생'],['b','30101','다른 학급']]) db.prepare('INSERT INTO roster VALUES (?,?,?)').run(...row);
-  const { server } = createApp({ db, studentClassId:'a' });
+  const mail = [];
+  const { server } = createApp({ db, studentClassId:'a', sendMail: async message => { mail.push(message); } });
   const serverB = createApp({ db, studentClassId:'b' }).server;
   server.listen(0,'127.0.0.1'); await once(server,'listening');
   serverB.listen(0,'127.0.0.1'); await once(serverB,'listening');
@@ -98,6 +99,23 @@ test('student assessment, teacher password access, class isolation and CSV', asy
   }
   db.prepare('UPDATE sessions SET expires=0 WHERE role=?').run('student');
   assert.equal((await call('/api/attempts',undefined,a)).status,401);
+  assert.equal((await call('/api/password',{id:'a',current:'wrong',next:'replacement-12',confirm:'replacement-12'})).status,401);
+  assert.equal((await call('/api/password',{id:'a',current:'teacher-password',next:'short',confirm:'short'})).status,400);
+  assert.equal((await call('/api/password',{id:'a',current:'teacher-password',next:'replacement-12',confirm:'other-password1'})).status,400);
+  assert.equal((await call('/api/password',{id:'a',current:'teacher-password',next:'replacement-12',confirm:'replacement-12'})).status,200);
+  assert.equal((await call('/api/login',{id:'a',password:'teacher-password'})).status,401);
+  assert.equal((await call('/api/login',{id:'a',password:'replacement-12'})).status,200);
+  assert.equal((await call('/api/password/code',{})).status,400);
+  assert.equal((await call('/api/password/email',{id:'a',current:'wrong',email:'teacher@example.com'})).status,401);
+  assert.equal((await call('/api/password/email',{id:'a',current:'replacement-12',email:'teacher@example.com'})).status,200);
+  assert.equal((await call('/api/password/code',{})).status,200);
+  const code = mail.at(-1).code;
+  assert.equal(mail.at(-1).to,'teacher@example.com');
+  assert.equal((await call('/api/password/recover',{code:'000000',next:'recovered-pass1',confirm:'recovered-pass1'})).status,401);
+  assert.equal((await call('/api/password/recover',{code,next:'recovered-pass1',confirm:'recovered-pass1'})).status,200);
+  assert.equal((await call('/api/login',{id:'a',password:'replacement-12'})).status,401);
+  assert.equal((await call('/api/login',{id:'a',password:'recovered-pass1'})).status,200);
+  assert.equal((await call('/api/password/recover',{code,next:'another-pass123',confirm:'another-pass123'})).status,401);
 });
 
 test('CSV quotes and spreadsheet formula protection', () => {

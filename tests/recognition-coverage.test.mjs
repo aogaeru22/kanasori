@@ -4,7 +4,7 @@ import {setupPractice} from '../js/practice.js';
 import {LESSONS,PASS_THRESHOLD} from '../js/lessons.js';
 import {WORD_TARGETS,wordTarget} from '../js/word-targets.js';
 import {assess} from '../js/score.js';
-import {expandLongVowels} from '../js/kana.js';
+import {expandLongVowels,countMorae} from '../js/kana.js';
 
 test('all 10 rows and 46 words capture final/interim speech, retry, and use 70 percent',async t=>{
  const previous={window:globalThis.window,document:globalThis.document,fetch:globalThis.fetch};
@@ -14,7 +14,7 @@ test('all 10 rows and 46 words capture final/interim speech, retry, and use 70 p
  globalThis.document={getElementById(id){if(!els.has(id))els.set(id,element());return els.get(id);},querySelectorAll(){return [];},createElement:element,body:element()};
  const el=id=>document.getElementById(id);
  let instance,captures=0,selected;
- class Recognition{constructor(){instance=this;}start(){this.onstart();}stop(){queueMicrotask(()=>this.onend());}abort(){this.onend();}}
+ class Recognition{constructor(){instance=this;this.starts=0;this.stops=0;}start(){this.starts+=1;this.onstart();}stop(){this.stops+=1;queueMicrotask(()=>this.onend());}abort(){this.onend();}}
  globalThis.window={SpeechRecognition:Recognition,addEventListener(){},navigator:{mediaDevices:{getUserMedia(){captures++;throw new Error('Do not open a second input');}}}};
  const saved=[];
  globalThis.fetch=async(path,options)=>{
@@ -33,16 +33,32 @@ test('all 10 rows and 46 words capture final/interim speech, retry, and use 70 p
    const practice=setupPractice(()=>selected,{singleWord});await flush();
    for(const target of targets){
      selected=target;el('micBtn').onclick();
-     assert.equal(instance.continuous,true);assert.equal(instance.interimResults,true);assert.equal(instance.maxAlternatives,1);
+     const morae=countMorae(target.reading);
+     assert.equal(instance.continuous,singleWord && morae===1 || !(singleWord && morae<=2));assert.equal(instance.interimResults,true);assert.equal(instance.maxAlternatives,5);
+     assert.equal(instance.lang,'ja-JP');
      const interim=Object.assign([{transcript:target.reading}],{isFinal:false});
      const count=saved.length;instance.onresult({results:[interim]});
+     if(singleWord && morae===1){
+       await flush();
+       assert.equal(saved.length,count+1,target.reading+' hypothesis was not saved');
+       assert.equal(saved.at(-1).lesson,target.id);
+       assert.equal(saved.at(-1).heard,target.reading);
+       assert.equal(el('scoreNum').textContent,'100%');assert.equal(practice.busy,false);
+       el('micBtn').onclick();instance.onend();await flush();
+       assert.equal(practice.busy,true,target.reading+' did not reopen after an empty end');
+       instance.onresult({results:[Object.assign([{transcript:target.reading}],{isFinal:true})]});
+       await flush();
+       assert.equal(saved.at(-1).heard,target.reading,target.reading+' late hypothesis was lost');
+       assert.equal(practice.busy,false);
+       continue;
+     }
      assert.equal(saved.length,count);assert.equal(practice.busy,true);
      instance.onresult({results:[Object.assign([{transcript:target.reading}],{isFinal:true})]});
      if(!singleWord)el('micBtn').onclick();await flush();
      assert.equal(saved.length,count+1);assert.equal(saved.at(-1).lesson,target.id);
      assert.equal(el('scoreNum').textContent,'100%');assert.equal(practice.busy,false);
      if(singleWord){
-       // Speech-end without a transcript must not stop a short word before
+       // Speech-end without a transcript must not stop a longer word before
        // the recognition service has delivered its delayed result.
        el('micBtn').onclick();instance.onspeechend();t.mock.timers.tick(2600);await flush();
        assert.equal(practice.busy,true,target.reading+' ended before text arrived');
@@ -57,15 +73,95 @@ test('all 10 rows and 46 words capture final/interim speech, retry, and use 70 p
    }
    practice.clear();
  }
- const practice=setupPractice(()=>selected,{singleWord:true});await flush();selected=wordTarget('a',2);
- assert.equal(selected.reading,'え');el('micBtn').onclick();
+ const practice=setupPractice(()=>selected,{singleWord:true});await flush(); selected=wordTarget('ta',4);assert.equal(selected.reading,'と');
+ el('micBtn').onclick();
+ instance.onresult({results:[Object.assign([{transcript:'と'}],{isFinal:false})]});
+ await flush();assert.equal(saved.at(-1).heard,'と');assert.equal(practice.busy,false);
+ el('micBtn').onclick();
+ instance.onresult({results:[Object.assign([{transcript:'とお'}],{isFinal:false})]});
+ await flush();assert.equal(saved.at(-1).heard,'と');assert.equal(practice.busy,false);
+ selected=wordTarget('na',1);assert.equal(selected.reading,'に');
+ el('micBtn').onclick();
+ instance.onresult({results:[Object.assign([{transcript:'にほ'}],{isFinal:false})]});
+ await flush();assert.equal(saved.at(-1).heard,'に');assert.equal(practice.busy,false);
+ el('micBtn').onclick();
+ instance.onresult({results:[Object.assign([{transcript:'にほん'}],{isFinal:false})]});
+ await flush();assert.equal(saved.at(-1).heard,'に');assert.equal(practice.busy,false);
+ el('micBtn').onclick();
+ instance.onresult({results:[Object.assign([{transcript:'る'}],{isFinal:true})]});
+ await flush();assert.equal(saved.at(-1).heard,'に');assert.equal(practice.busy,false);
+ el('micBtn').onclick();const niStarts=instance.starts??0;instance.onspeechstart();instance.onspeechend();
+ await flush();assert.equal(practice.busy,true);assert.equal(instance.starts??0,niStarts);
+ instance.onresult({results:[Object.assign([{transcript:'に'}],{isFinal:true})]});
+ await flush();assert.equal(saved.at(-1).heard,'に');assert.equal(practice.busy,false);
+ selected=wordTarget('ha',1);assert.equal(selected.reading,'ひ');
+ const beforeHi=saved.length;el('micBtn').onclick();
+ instance.onresult({results:[Object.assign([{transcript:'し'}],{isFinal:false})]});
+ await flush();assert.equal(saved.length,beforeHi);assert.equal(practice.busy,true);
+ instance.onresult({results:[Object.assign([{transcript:'い'}],{isFinal:false})]});
+ await flush();assert.equal(saved.at(-1).heard,'ひ');assert.equal(el('scoreNum').textContent,'100%');assert.equal(practice.busy,false);
+ el('micBtn').onclick();
+ instance.onresult({results:[Object.assign([{transcript:'ひと'}],{isFinal:true})]});
+ await flush();assert.equal(saved.at(-1).heard,'ひ');assert.equal(el('scoreNum').textContent,'100%');
+ el('micBtn').onclick();
+ instance.onresult({results:[Object.assign([{transcript:'ふ'}],{isFinal:true})]});
+ await flush();assert.equal(saved.at(-1).heard,'ひ');assert.equal(el('scoreNum').textContent,'100%');
+ el('micBtn').onclick();const hiStarts=instance.starts;instance.onspeechstart();instance.onspeechend();
+ await flush();assert.equal(practice.busy,true);assert.equal(instance.starts,hiStarts);
+ instance.onresult({results:[Object.assign([{transcript:'ふ'}],{isFinal:true})]});
+ await flush();assert.equal(saved.at(-1).heard,'ひ');assert.equal(practice.busy,false);
+ selected=wordTarget('ma',3);assert.equal(selected.reading,'め');
+ el('micBtn').onclick();
+ instance.onresult({results:[Object.assign([{transcript:'め'}],{isFinal:false})]});
+ await flush();assert.equal(saved.at(-1).heard,'め');assert.equal(practice.busy,false);
+ selected=wordTarget('ta',3);assert.equal(selected.reading,'て');
+ el('micBtn').onclick();
+ instance.onresult({results:[Object.assign([{transcript:'て'}],{isFinal:true})]});
+ await flush();assert.equal(saved.at(-1).heard,'て');assert.equal(practice.busy,false);
+ selected=wordTarget('a',2);
+ assert.equal(selected.reading,'え');
+ // え is captured like と: a matching interim is saved in the same open session.
+ el('micBtn').onclick();
+ assert.equal(instance.continuous,true);
  instance.onresult({results:[Object.assign([{transcript:'え'}],{isFinal:false})]});
- instance.onend();await flush();assert.equal(saved.at(-1).heard,'え');assert.equal(practice.busy,false);
+ await flush();assert.equal(saved.at(-1).heard,'え');assert.equal(el('scoreNum').textContent,'100%');assert.equal(practice.busy,false);
+ el('micBtn').onclick();
+ instance.onresult({results:[Object.assign([{transcript:'에'}],{isFinal:false})]});
+ await flush();assert.equal(saved.at(-1).heard,'え');assert.equal(el('scoreNum').textContent,'100%');assert.equal(practice.busy,false);
+ el('micBtn').onclick();
+ instance.onresult({results:[Object.assign([{transcript:'ええ'}],{isFinal:false})]});
+ await flush();assert.equal(saved.at(-1).heard,'え');assert.equal(practice.busy,false);
+ el('micBtn').onclick();
+ instance.onresult({results:[Object.assign([{transcript:'あい'},{transcript:'え'}],{isFinal:true})]});
+ await flush();assert.equal(saved.at(-1).heard,'え');assert.equal(el('scoreNum').textContent,'100%');
+ el('micBtn').onclick();
+ instance.onresult({results:[Object.assign([{transcript:'えんぴつ'}],{isFinal:true})]});
+ await flush();assert.equal(saved.at(-1).heard,'えんぴつ');assert.notEqual(el('scoreNum').textContent,'100%');
+ el('micBtn').onclick();const eStarts=instance.starts;instance.onspeechstart();instance.onspeechend();
+ await flush();assert.equal(practice.busy,true);assert.equal(instance.starts,eStarts);
+ instance.onresult({results:[Object.assign([{transcript:'え'}],{isFinal:true})]});
+ await flush();assert.equal(saved.at(-1).heard,'え');assert.equal(practice.busy,false);
+ el('micBtn').onclick();instance.onend();await flush();assert.equal(practice.busy,true);
+ instance.onresult({results:[Object.assign([{transcript:'ええ'}],{isFinal:true})]});
+ await flush();assert.equal(saved.at(-1).heard,'え');assert.equal(el('scoreNum').textContent,'100%');assert.equal(practice.busy,false);
+ selected=wordTarget('a',0);assert.equal(selected.reading,'あい');
+ const beforeAi=saved.length;el('micBtn').onclick();
+ instance.onresult({results:[Object.assign([{transcript:'あ'}],{isFinal:true})]});
+ await flush();assert.equal(saved.length,beforeAi);
+ instance.onresult({results:[Object.assign([{transcript:'あい'}],{isFinal:true})]});
+ await flush();assert.equal(saved.at(-1).heard,'あい');assert.equal(el('scoreNum').textContent,'100%');
  // A later final result replaces the interim rather than being duplicated.
  el('micBtn').onclick();instance.onresult({results:[Object.assign([{transcript:'え'}],{isFinal:false})]});
  instance.onresult({results:[Object.assign([{transcript:'ひ'},{transcript:'え'}],{isFinal:true})]});
  await flush();assert.equal(saved.at(-1).heard,'ひ');assert.equal(el('scoreNum').textContent,'0%');
- const count=saved.length;el('micBtn').onclick();instance.onerror({error:'no-speech'});await flush();assert.equal(saved.length,count);assert.equal(practice.busy,false);
+ const count=saved.length;el('micBtn').onclick();
+ instance.onerror({error:'no-speech'});instance.onend();await flush();
+ assert.equal(saved.length,count);assert.equal(practice.busy,true);
+ t.mock.timers.tick(2500);await flush();
+ assert.equal(practice.busy,true);assert.match(el('micHint').textContent,/또박또박/);
+ instance.onerror({error:'no-speech'});instance.onend();t.mock.timers.tick(2500);await flush();
+ instance.onerror({error:'no-speech'});instance.onend();t.mock.timers.tick(2500);await flush();
+ assert.equal(saved.length,count);assert.equal(practice.busy,false);
  el('micBtn').onclick();instance.onerror({error:'not-allowed'});await flush();assert.match(el('micHint').textContent,/허용/);assert.equal(practice.busy,false);
  for(const [heard,score,pass] of [['あいうえおかきさささ',70,true],['あいうえおかささささ',60,false]]){
    selected={id:'boundary',reading:'あいうえおかきくけこ'};el('micBtn').onclick();instance.onresult({results:[Object.assign([{transcript:heard}],{isFinal:true})]});await flush();
@@ -85,5 +181,39 @@ test('all 10 rows and 46 words capture final/interim speech, retry, and use 70 p
  assert.equal(el('heardText').textContent,'おおい');
  instance.onresult({results:[Object.assign([{transcript:'おーい'}],{isFinal:true})]});
  await flush();assert.equal(el('scoreNum').textContent,'100%');
+ selected=wordTarget('na',4);assert.equal(selected.reading,'のき');el('micBtn').onclick();
+ instance.onresult({results:[Object.assign([{transcript:'のんき'}],{isFinal:true})]});
+ await flush();assert.equal(saved.at(-1).heard,'のき');assert.equal(el('scoreNum').textContent,'100%');
+ selected=wordTarget('na',4);el('micBtn').onclick();
+ instance.onresult({results:[Object.assign([{transcript:'ノーキ'}],{isFinal:true})]});
+ await flush();assert.equal(saved.at(-1).heard,'のき');assert.equal(el('scoreNum').textContent,'100%');
+ selected=wordTarget('na',4);el('micBtn').onclick();
+ instance.onresult({results:[Object.assign([{transcript:'ろっきい'}],{isFinal:true})]});
+ await flush();assert.equal(saved.at(-1).heard,'のき');assert.equal(el('scoreNum').textContent,'100%');
+ selected=wordTarget('ha',4);assert.equal(selected.reading,'ほし');el('micBtn').onclick();
+ instance.onresult({results:[Object.assign([{transcript:'ほしい'}],{isFinal:true})]});
+ await flush();assert.equal(saved.at(-1).heard,'ほし');assert.equal(el('scoreNum').textContent,'100%');
+ selected=wordTarget('ra',3);assert.equal(selected.reading,'れつ');el('micBtn').onclick();
+ instance.onresult({results:[Object.assign([{transcript:'レッツ'}],{isFinal:true})]});
+ await flush();assert.equal(saved.at(-1).heard,'れつ');assert.equal(el('scoreNum').textContent,'100%');
+ selected=wordTarget('ma',1);assert.equal(selected.reading,'みみ');el('micBtn').onclick();
+ instance.onresult({results:[Object.assign([{transcript:'み'}],{isFinal:true})]});
+ instance.onend();await flush();assert.equal(saved.at(-1).heard,'みみ');assert.equal(el('scoreNum').textContent,'100%');
+ selected=wordTarget('ta',3);assert.equal(selected.reading,'て');el('micBtn').onclick();
+ instance.onresult({results:[Object.assign([{transcript:'테'}],{isFinal:true})]});
+ await flush();assert.equal(saved.at(-1).heard,'て');assert.equal(el('scoreNum').textContent,'100%');
+ selected=wordTarget('a',0);el('micBtn').onclick();
+ instance.onresult({results:[Object.assign([{transcript:'はい'}],{isFinal:true})]});
+ await flush();assert.equal(saved.at(-1).heard,'あい');assert.equal(el('scoreNum').textContent,'100%');
+ selected=wordTarget('a',4);assert.equal(selected.reading,'いえ');el('micBtn').onclick();
+ instance.onresult({results:[Object.assign([{transcript:'いいえ'}],{isFinal:true})]});
+ await flush();assert.equal(saved.at(-1).heard,'いえ');assert.equal(el('scoreNum').textContent,'100%');
+ selected=wordTarget('a',2);el('micBtn').onclick();
+ instance.onresult({results:[Object.assign([{transcript:'へ'}],{isFinal:true})]});
+ await flush();assert.equal(saved.at(-1).heard,'え');assert.equal(el('scoreNum').textContent,'100%');
+ const beforeOther=saved.length;el('micBtn').onclick();
+ instance.onresult({results:[Object.assign([{transcript:'ひ'}],{isFinal:true})]});
+ await flush();assert.equal(saved.at(-1).heard,'ひ');assert.equal(el('scoreNum').textContent,'0%');
+ assert.equal(saved.length,beforeOther+1);
  assert.equal(captures,0);practice.clear();
 });

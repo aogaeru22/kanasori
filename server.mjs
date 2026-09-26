@@ -1,5 +1,5 @@
 import { createServer } from 'node:http';
-import { randomBytes, randomUUID, createHash } from 'node:crypto';
+import { randomBytes, randomInt, randomUUID, createHash, timingSafeEqual } from 'node:crypto';
 import { readFile, stat } from 'node:fs/promises';
 import { resolve, extname, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -13,6 +13,30 @@ import { recognizedHiragana } from './server/hiragana.mjs';
 const ROOT = fileURLToPath(new URL('.', import.meta.url));
 const MAX_BODY = 16 * 1024;
 const dummyHash = hashPassword(randomBytes(24).toString('hex'));
+function maskEmail(email) {
+  const [name, domain] = email.split('@');
+  return `${name.slice(0, 1)}***@${domain}`;
+}
+async function deliverRecoveryCode(sendMail, message) {
+  if (sendMail) return sendMail(message);
+  const host = process.env.MAIL_HOST;
+  const user = process.env.MAIL_USER;
+  const pass = process.env.MAIL_PASSWORD;
+  if (!host || !user || !pass) throw Object.assign(new Error('인증 메일을 보내려면 서버의 메일 설정이 필요합니다.'), { status: 503 });
+  const { createTransport } = await import('nodemailer');
+  const port = Number(process.env.MAIL_PORT || 587);
+  const transport = createTransport({ host, port, secure: port === 465, auth: { user, pass } });
+  try {
+    await transport.sendMail({
+      from: process.env.MAIL_FROM || user,
+      to: message.to,
+      subject: '가나소리 교사 인증 번호',
+      text: `교사 비밀번호를 다시 정하는 인증 번호는 ${message.code} 입니다.\n10분 안에 로그인 창에 입력하세요.`,
+    });
+  } catch {
+    throw Object.assign(new Error('인증 메일을 보내지 못했습니다. 메일 설정을 확인해 주세요.'), { status: 502 });
+  }
+}
 const digest = value => createHash('sha256').update(value).digest('hex');
 const failure = (status, message) => Object.assign(new Error(message), { status });
 function findLesson(id) {
@@ -24,7 +48,7 @@ export function csvCell(value) {
   if (/^[\s]*[=+\-@\t\r\n]/.test(text)) text = "'" + text;
   return '"' + text.replaceAll('"', '""') + '"';
 }
-export function createApp({ db = openStore(resolve(process.env.DATA_DIR || 'data', 'kanasori.sqlite')), origin = process.env.APP_ORIGIN, secure = process.env.NODE_ENV === 'production', preview = false, studentClassId = process.env.STUDENT_CLASS_ID } = {}) {
+export function createApp({ db = openStore(resolve(process.env.DATA_DIR || 'data', 'kanasori.sqlite')), origin = process.env.APP_ORIGIN, secure = process.env.NODE_ENV === 'production', preview = false, studentClassId = process.env.STUDENT_CLASS_ID, sendMail } = {}) {
   const sheets = createSheetsSync(db,{url:process.env.SHEETS_WEB_APP_URL,token:process.env.SHEETS_SYNC_TOKEN,preview});
   const rates = new Map();
   const schoolDay = () => new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
@@ -52,7 +76,7 @@ export function createApp({ db = openStore(resolve(process.env.DATA_DIR || 'data
         const relative = path === '/' ? 'index.html' : path.slice(1);
         // Explicit public allowlist: never serve the database, server code, or config secrets.
         const allowed = /^(attendance\.html|index\.html|app\.js|style\.css|teacher\.html|results\.html|js\/[a-z-]+\.js|css\/[a-z-]+\.css)$/.test(relative)
-          || /^kana\/(play\.html|catalog\.json|[^.][^\\]*\.(swf|hwp))$/.test(relative)
+          || /^kana\/(play\.html|catalog\.json|pronunciation-button\.png|[^.][^\\]*\.(swf|hwp))$/.test(relative)
           || /^fonts\/kyotai-w[234]\.woff2$/.test(relative)
           || /^audio\/feedback\/(?:[0-9]|[1-9][0-9]|100)\.wav$/.test(relative);
         const file = resolve(ROOT, relative);
@@ -60,8 +84,8 @@ export function createApp({ db = openStore(resolve(process.env.DATA_DIR || 'data
         try {
           const info = await stat(file);
           if (!info.isFile()) throw new Error();
-          const types = { '.woff2': 'font/woff2', '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json; charset=utf-8', '.swf': 'application/x-shockwave-flash', '.hwp': 'application/octet-stream' };
-          res.writeHead(200, { 'Content-Type': extname(file) === '.wav' ? 'audio/wav' : types[extname(file)] || 'application/octet-stream' });
+          const types = { '.woff2': 'font/woff2', '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json; charset=utf-8', '.png': 'image/png', '.swf': 'application/x-shockwave-flash', '.hwp': 'application/octet-stream' };
+          res.writeHead(200, { 'Content-Type': extname(file) === '.wav' ? 'audio/wav' : types[extname(file)] || 'application/octet-stream', 'Cache-Control': 'no-store' });
           res.end(req.method === 'HEAD' ? undefined : await readFile(file));
         } catch { if (!res.headersSent) throw failure(404, '찾을 수 없습니다.'); }
         return;
@@ -74,7 +98,7 @@ export function createApp({ db = openStore(resolve(process.env.DATA_DIR || 'data
         if (!req.headers['content-type']?.startsWith('application/json')) throw failure(415, 'JSON 요청이 필요합니다.');
       }
       const teacherRequest = path === '/api/login' || path === '/api/export' || path.startsWith('/api/teacher/');
-      if (path.startsWith('/api/teacher/') && !['/api/teacher/me','/api/teacher/attempts','/api/teacher/logout','/api/teacher/attendance','/api/teacher/roster','/api/teacher/sheets'].includes(path)) throw failure(404, '찾을 수 없습니다.');
+      if (path.startsWith('/api/teacher/') && !['/api/teacher/me','/api/teacher/attempts','/api/teacher/logout','/api/teacher/attendance','/api/teacher/roster','/api/teacher/roster/delete','/api/teacher/sheets'].includes(path)) throw failure(404, '찾을 수 없습니다.');
       if (path.startsWith('/api/teacher/')) path = path.replace('/api/teacher/', '/api/');
       const cookieName = teacherRequest ? 'kanasori_teacher' : 'kanasori';
       const cookie = new RegExp(`(?:^|;\\s*)${cookieName}=([a-f0-9]{64})(?:;|$)`).exec(req.headers.cookie || '')?.[1];
@@ -103,6 +127,83 @@ export function createApp({ db = openStore(resolve(process.env.DATA_DIR || 'data
         if (!verifyPassword(password, teacher?.password || dummyHash) || !teacher) throw failure(401, '아이디 또는 비밀번호를 확인하세요.');
         setSession('teacher', id, null, null, teacher.name); return send(200, { ok: true });
       }
+      if (path === '/api/password' && req.method === 'POST') {
+        limit(`password:${req.socket.remoteAddress}`, 8);
+        const data = await body();
+        const current = text(data.current, 200);
+        const next = text(data.next, 200);
+        const confirm = text(data.confirm, 200);
+        if (next.length < 12) throw failure(400, '새 비밀번호는 12자 이상으로 정하세요.');
+        if (next !== confirm) throw failure(400, '새 비밀번호가 서로 다릅니다.');
+        if (next === current) throw failure(400, '현재 비밀번호와 다른 비밀번호로 정하세요.');
+        const named = data.id ? [db.prepare('SELECT * FROM teachers WHERE id=?').get(text(data.id, 80))].filter(Boolean) : db.prepare('SELECT * FROM teachers').all();
+        const matches = named.filter(teacher => verifyPassword(current, teacher.password));
+        if (matches.length !== 1) {
+          verifyPassword(current, dummyHash);
+          throw failure(401, '현재 비밀번호를 확인하세요.');
+        }
+        const teacher = matches[0];
+        if (db.prepare('SELECT * FROM teachers WHERE id<>?').all(teacher.id).some(other => verifyPassword(next, other.password))) throw failure(400, '다른 교사와 같은 비밀번호는 사용할 수 없습니다.');
+        db.prepare('UPDATE teachers SET password=? WHERE id=?').run(hashPassword(next), teacher.id);
+        db.prepare('DELETE FROM sessions WHERE role=? AND owner=?').run('teacher', teacher.id);
+        return send(200, { ok: true });
+      }
+      if (path === '/api/password/email' && req.method === 'POST') {
+        limit(`password-email:${req.socket.remoteAddress}`, 8);
+        const data = await body();
+        const current = text(data.current, 200);
+        const email = text(data.email, 120);
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw failure(400, '이메일 주소를 확인하세요.');
+        const named = data.id ? [db.prepare('SELECT * FROM teachers WHERE id=?').get(text(data.id, 80))].filter(Boolean) : db.prepare('SELECT * FROM teachers').all();
+        const matches = named.filter(teacher => verifyPassword(current, teacher.password));
+        if (matches.length !== 1) {
+          verifyPassword(current, dummyHash);
+          throw failure(401, '현재 비밀번호를 확인하세요.');
+        }
+        db.prepare('INSERT INTO recovery_emails VALUES (?,?) ON CONFLICT(teacher) DO UPDATE SET email=excluded.email').run(matches[0].id, email);
+        return send(200, { ok: true, to: maskEmail(email) });
+      }
+      if (path === '/api/password/code' && req.method === 'POST') {
+        limit(`password-code:${req.socket.remoteAddress}`, 3);
+        await body();
+        const saved = db.prepare('SELECT teacher, email FROM recovery_emails').all();
+        if (saved.length !== 1) throw failure(400, '복구 이메일이 등록되어 있지 않습니다. 현재 비밀번호로 먼저 등록하세요.');
+        const code = String(randomInt(0, 1000000)).padStart(6, '0');
+        await deliverRecoveryCode(sendMail, { to: saved[0].email, code });
+        db.prepare('INSERT INTO recovery_codes VALUES (?,?,?,?) ON CONFLICT(teacher) DO UPDATE SET hash=excluded.hash, expires=excluded.expires, tries=0').run(saved[0].teacher, createHash('sha256').update(code).digest('hex'), Date.now() + 10 * 60 * 1000, 0);
+        return send(200, { ok: true, to: maskEmail(saved[0].email) });
+      }
+      if (path === '/api/password/recover' && req.method === 'POST') {
+        limit(`recover:${req.socket.remoteAddress}`, 8);
+        const data = await body();
+        const code = text(data.code, 20);
+        const next = text(data.next, 200);
+        const confirm = text(data.confirm, 200);
+        if (next.length < 12) throw failure(400, '새 비밀번호는 12자 이상으로 정하세요.');
+        if (next !== confirm) throw failure(400, '새 비밀번호가 서로 다릅니다.');
+        const pending = db.prepare('SELECT * FROM recovery_codes WHERE expires>?').all(Date.now());
+        if (!pending.length) throw failure(401, '인증 번호가 만료되었습니다. 다시 요청하세요.');
+        const digestCode = value => createHash('sha256').update(value).digest();
+        const match = pending.find(row => {
+          const expected = Buffer.from(row.hash, 'hex');
+          const actual = digestCode(code);
+          return expected.length === actual.length && timingSafeEqual(actual, expected);
+        });
+        if (!match) {
+          for (const row of pending) {
+            if (row.tries + 1 >= 5) db.prepare('DELETE FROM recovery_codes WHERE teacher=?').run(row.teacher);
+            else db.prepare('UPDATE recovery_codes SET tries=? WHERE teacher=?').run(row.tries + 1, row.teacher);
+          }
+          throw failure(401, '인증 번호가 맞지 않습니다.');
+        }
+        const teacher = db.prepare('SELECT * FROM teachers WHERE id=?').get(match.teacher);
+        if (!teacher || verifyPassword(next, teacher.password)) throw failure(400, '현재 비밀번호와 다른 비밀번호로 정하세요.');
+        if (db.prepare('SELECT * FROM teachers WHERE id<>?').all(teacher.id).some(other => verifyPassword(next, other.password))) throw failure(400, '다른 교사와 같은 비밀번호는 사용할 수 없습니다.');
+        db.prepare('UPDATE teachers SET password=? WHERE id=?').run(hashPassword(next), teacher.id);
+        db.prepare('DELETE FROM recovery_codes WHERE teacher=?').run(teacher.id);
+        db.prepare('DELETE FROM sessions WHERE role=? AND owner=?').run('teacher', teacher.id);
+        return send(200, { ok: true });
+      }
       if (path === '/api/join' && req.method === 'POST') {
         limit(`join:${req.socket.remoteAddress}`, 120);
         const data = await body();
@@ -125,26 +226,86 @@ export function createApp({ db = openStore(resolve(process.env.DATA_DIR || 'data
         return send(200, { role: session.role, name: session.name, number: session.number, classId: session.classId, classes, preview });
       }
       if (path === '/api/sheets' && req.method === 'GET') { auth('teacher'); return send(200,sheets.status(session.owner)); }
-      if (path === '/api/attendance' || path === '/api/roster') {
+      if (path === '/api/attendance' || path === '/api/roster' || path === '/api/roster/delete') {
         auth('teacher');
         const data = req.method === 'POST' ? await body() : null;
         const classId = text(data?.classId || url.searchParams.get('classId'),80);
         if (!db.prepare('SELECT 1 FROM permissions WHERE teacher=? AND classId=?').get(session.owner,classId)) throw failure(403,'담당 학급만 확인하거나 수정할 수 있습니다.');
         if (path === '/api/roster') {
           if (req.method !== 'POST') throw failure(405,'허용되지 않는 요청입니다.');
-          if (!Array.isArray(data.students) || !data.students.length || data.students.length > 100) throw failure(400,'1~100명의 명단을 입력하세요.');
+          if (!Array.isArray(data.students) || !data.students.length || data.students.length > 400) throw failure(400,'1~400명의 명단을 입력하세요.');
           const students = data.students.map(row => ({ number:text(row?.number,20),name:text(row?.name,40) }));
-          if (new Set(students.map(r=>r.number)).size !== students.length) throw failure(400,'명단에 중복 학번이 있습니다.');
+          // Same names are allowed. A student number identifies one person, so the same number with a different name is refused.
+          const byNumber = new Map();
+          for (const row of students) {
+            const names = byNumber.get(row.number) || new Set();
+            names.add(row.name);
+            byNumber.set(row.number, names);
+          }
+          const pastedConflicts = [...byNumber].filter(([, names]) => names.size > 1);
+          if (pastedConflicts.length) throw failure(400, pastedConflicts.map(([number, names]) => `${number} 학번에 서로 다른 이름 ${names.size}명이 있습니다. 등록할 수 없습니다.`).join('\n'));
+          const unique = [...byNumber].map(([number, names]) => ({ number, name: [...names][0] }));
+          const asParticle = value => {
+            const code = value.charCodeAt(value.length - 1);
+            const batchim = code >= 0xAC00 && code <= 0xD7A3 ? (code - 0xAC00) % 28 : 1;
+            return batchim ? '으로' : '로';
+          };
+          const storedConflicts = [];
+          for (const row of unique) {
+            const previous = db.prepare('SELECT name FROM roster WHERE classId=? AND number=?').get(classId, row.number);
+            if (previous && previous.name !== row.name) storedConflicts.push(`${row.number}는 이미 '${previous.name}'${asParticle(previous.name)} 등록되어 있습니다. '${row.name}'${asParticle(row.name)}는 등록할 수 없습니다.`);
+          }
+          if (storedConflicts.length) throw failure(400, storedConflicts.join('\n'));
           db.exec('BEGIN');
           try {
-            for (const row of students) {
-              const previous = db.prepare('SELECT name FROM roster WHERE classId=? AND number=?').get(classId,row.number);
-              if (previous && previous.name !== row.name) throw failure(400,'이미 등록된 학번의 이름이 다릅니다. 운영 담당자에게 정정을 요청하세요.');
-              db.prepare('INSERT INTO roster VALUES (?,?,?) ON CONFLICT(classId,number) DO NOTHING').run(classId,row.number,row.name);
-            }
+            const save = db.prepare('INSERT INTO roster VALUES (?,?,?) ON CONFLICT(classId,number) DO NOTHING');
+            for (const row of unique) save.run(classId, row.number, row.name);
             db.exec('COMMIT');
           } catch(error) { db.exec('ROLLBACK'); throw error; }
           return send(200,{ok:true});
+        }
+        if (path === '/api/roster/delete') {
+          if (req.method !== 'POST') throw failure(405,'허용되지 않는 요청입니다.');
+          if (!Array.isArray(data.students) || !data.students.length || data.students.length > 400) throw failure(400,'1~400명의 학번을 입력하세요.');
+          const rows = data.students.map(row => {
+            const number = text(row?.number,20);
+            const name = typeof row?.name === 'string' ? row.name.trim() : '';
+            if (name.length > 40) throw failure(400,'입력 내용을 확인하세요.');
+            return { number, name };
+          });
+          const byNumber = new Map();
+          for (const row of rows) {
+            const names = byNumber.get(row.number) || new Set();
+            if (row.name) names.add(row.name);
+            byNumber.set(row.number, names);
+          }
+          const pastedConflicts = [...byNumber].filter(([, names]) => names.size > 1);
+          if (pastedConflicts.length) throw failure(400, pastedConflicts.map(([number, names]) => `${number} 학번에 서로 다른 이름 ${names.size}명이 있습니다. 삭제할 수 없습니다.`).join('\n'));
+          const asParticle = value => {
+            const code = value.charCodeAt(value.length - 1);
+            const batchim = code >= 0xAC00 && code <= 0xD7A3 ? (code - 0xAC00) % 28 : 1;
+            return batchim ? '으로' : '로';
+          };
+          const mismatches = [];
+          const missing = [];
+          const targets = [];
+          for (const [number, names] of byNumber) {
+            const previous = db.prepare('SELECT name FROM roster WHERE classId=? AND number=?').get(classId, number);
+            const name = [...names][0] || '';
+            if (!previous) missing.push(number);
+            else if (name && name !== previous.name) mismatches.push(`${number}는 이미 '${previous.name}'${asParticle(previous.name)} 등록되어 있습니다. '${name}'${asParticle(name)}는 삭제할 수 없습니다.`);
+            else targets.push(number);
+          }
+          if (mismatches.length) throw failure(400, mismatches.join('\n'));
+          if (missing.length) throw failure(400, `명단에 없는 학번입니다: ${missing.join(', ')}. 삭제할 수 없습니다.`);
+          db.exec('BEGIN');
+          try {
+            const dropAttendance = db.prepare('DELETE FROM attendance WHERE classId=? AND number=?');
+            const dropRoster = db.prepare('DELETE FROM roster WHERE classId=? AND number=?');
+            for (const number of targets) { dropAttendance.run(classId, number); dropRoster.run(classId, number); }
+            db.exec('COMMIT');
+          } catch(error) { db.exec('ROLLBACK'); throw error; }
+          return send(200,{ok:true,removed:targets.length});
         }
         if (data) {
           const number = text(data.number,20), name = text(data.name,40);

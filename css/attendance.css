@@ -10,3 +10,8 @@
 .attendance-surface #classId,
 .attendance-surface .list-heading h3,
 .attendance-surface .manual-section h3{font-family:KanaKyotai,"Gaegu",cursive;font-weight:700;color:#173e32}
+.teacher-auth .password-change{margin-top:18px}
+.teacher-auth .password-change summary{cursor:pointer;font-weight:700}
+.teacher-auth .password-change p{margin:10px 0 0;line-height:1.5}
+.teacher-auth .password-change label{margin:12px 0 8px}
+.teacher-auth .password-change .primary{margin-top:8px}

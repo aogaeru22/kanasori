@@ -30,6 +30,8 @@ header,.topbar,.attendance-page header,.learning-nav {
 }
 a,.brand,.learning-nav a { color:var(--chalk); }
 .brand small,.brand-kana,.intro .eyebrow,.section-label,.eyebrow { color:var(--yellow); }
+.topbar .brand-kana { color:var(--chalk); }
+.heading-brand { color:var(--yellow); }
 .brand { letter-spacing:.02em; }
 body h1,body h2,body h3,.surface h2,.intro h1,.dialog-heading h2,
 .attendance-surface .board-heading h2 {
@@ -42,7 +44,8 @@ body h1 { line-height:1.22; }
 .intro h1 span::after { content:''; position:absolute; left:0; right:0; bottom:-6px; height:5px; border-bottom:3px solid var(--yellow); border-radius:45%; transform:rotate(-2deg); opacity:.8; }
 .intro p,.intro-bottom,.muted,.small,.micro,.note,.message,footer { color:var(--muted); }
 .wordmark,.brand { font-family:KanaKyotai,'Gaegu',cursive; font-weight:700; color:var(--chalk); }
-.wordmark span { color:var(--yellow); }
+.wordmark,.wordmark span { color:var(--yellow); }
+body.home .brand { color:var(--yellow); }
 .intro-bottom { border-color:var(--line); }
 .surface,.card,.panel,.teacher-auth,dialog,.speaking-card,.score-result,.heard-box {
   background:#233e29e8; color:var(--chalk); border:1px solid #f5f5dc70;
@@ -90,8 +93,18 @@ dialog.teacher-auth .section-label { color:var(--yellow); }
 .attendance-stats>div { background:#f5f5dc08; border-color:var(--line); border-radius:7px 10px 6px 8px; }
 .attendance-stats .present-stat { background:#ffd7000a; color:var(--yellow); }
 .attendance-stats .absent-stat { background:#ff6b6b0e; color:#ffaaa2; }
-.absence-badge,.down,.verdict.fail,.diff-line .bad,.status.err,.auth-status,#message,#rosterMessage { color:#ffaaa2; }
-.absence-badge::before { background:var(--red); }
+.absence-badge,.down,.verdict.fail,.diff-line .bad,.status.err,.auth-status,#message,#rosterMessage,#rosterRemoveMessage { color:#ffaaa2; }
+.absence-badge::before {
+  width: 11px;
+  height: 11px;
+  vertical-align: -1px;
+  background:
+    radial-gradient(circle at 35% 32%, #e8a29c 0 16%, #c43730 42%, #7a1614 100%);
+  box-shadow:
+    0 0 0 1px #3a1412,
+    0 0 3px 1px #a8322c66,
+    inset 0 -2px 2px #4a0c0a88;
+}
 .manual-section p,.roster-settings p,.board-footnote,.list-heading>span,#empty { color:var(--muted); }
 th { color:var(--chalk); background:#365339; border-bottom:1px solid #f5f5dc80; }
 td,th { border-color:var(--line); }
@@ -104,7 +117,15 @@ tbody tr:hover { background:#f5f5dc07; }
 .page-heading h1::after { content:''; display:block; width:min(260px,75%); border-bottom:2px solid var(--yellow); transform:rotate(-1deg); margin-top:9px; opacity:.8; }
 .filter-label,.student-filter,.summary-grid span,.summary-grid small,.method-note,.empty { color:var(--muted); }
 .filter-label { color:var(--chalk); }
-.class-buttons button { border-radius:46% 43% 48% 44%; }
+.class-buttons button {
+  border-radius:46% 43% 48% 44%;
+  padding:8px 16px;
+  font-size:20px;
+  font-weight:800;
+  font-synthesis:weight;
+  color:#fff8dc;
+  text-shadow:.4px 0 0 currentColor, -.4px 0 0 currentColor;
+}
 .class-buttons button[aria-pressed=true],.row-tab.active,button.active { background:#ffd70018; color:var(--yellow); border:2px solid var(--yellow); }
 .summary-grid strong { color:var(--yellow); }
 .summary-grid article { border-style:dashed; }
@@ -125,13 +146,13 @@ tbody tr:hover { background:#f5f5dc07; }
 .stage,.lesson-title { background:white; }
 .lesson-title,.lesson-title span { color:#2D4A2D; }
 .lesson-title .lesson-title-suffix { color:#965322; }
-.pronunciation-link,.return-link { background:var(--board); color:var(--chalk); border:2px solid #f5f5dc90; }
+.return-link { background:var(--board); color:var(--chalk); border:2px solid #f5f5dc90; }
+.pronunciation-link { background:transparent; border:0; box-shadow:none; padding:0; }
 .mic { color:var(--board-dark); background:var(--yellow); border:3px solid #fff4ac; box-shadow:0 0 0 6px #ffd70015; }
 .mic.recording { background:var(--red); color:#fff; border-color:#ffd3cd; }
 .mic-hint,.save-status,.heard-box span,.verdict-sub,.speaking-title,.ring small { color:var(--muted); }
 .ring::before { background:var(--board-dark); }
 .ring b,.heard-box b { color:var(--chalk); }
-#longVowelNote { color:var(--yellow)!important; }
 .word-selection { border-color:#b87900; }
 :is(a,button,input,select,textarea,summary):focus-visible { outline:3px solid var(--yellow); outline-offset:4px; }
 @media(max-width:700px) {
@@ -151,7 +172,8 @@ body h2{font-size:26px}body h3{font-size:21px}.attendance-surface h3{font-size:1
 .attendance-surface .list-heading>span,.attendance-surface .board-footnote,.attendance-surface .manual-section p,.attendance-surface .manual-section label,.attendance-surface .roster-settings,.attendance-surface .roster-settings label{font-size:15px}
 .attendance-surface table{font-size:16px}
 .attendance-surface th{font-size:14px}
-.attendance-surface .manual-section input,.attendance-surface .manual-section select,.attendance-surface .manual-section .primary,.attendance-surface #message,.attendance-surface #rosterMessage,.attendance-surface #empty{font-size:16px}
+.attendance-surface .manual-section input,.attendance-surface .manual-section select,.attendance-surface .manual-section .primary,.attendance-surface #message,.attendance-surface #rosterMessage,.attendance-surface #rosterRemoveMessage,.attendance-surface #empty{font-size:16px}
+.attendance-surface #message,.attendance-surface #rosterMessage,.attendance-surface #rosterRemoveMessage{white-space:pre-line;line-height:1.6}
 #privacy .privacy-copy,#privacy .privacy-copy h3,#privacy .privacy-copy p{font-family:"Malgun Gothic","Apple SD Gothic Neo","Noto Sans KR",sans-serif;text-shadow:none;letter-spacing:0}
 #privacy .privacy-copy h3{font-weight:700}
 

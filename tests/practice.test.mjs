@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { setupPractice } from '../js/practice.js';
+import { setupPractice, perfectPraise } from '../js/practice.js';
 import { wordTarget } from '../js/word-targets.js';
 import { assess } from '../js/score.js';
 import { recognizedHiragana } from '../server/hiragana.mjs';
@@ -107,7 +107,8 @@ test('selected words immediately show feedback and mismatches without audio play
     assert.equal(el('scoreNum').textContent,`${score}%`);
     assert.match(el('heardText').textContent,/^[ぁ-ゖ]+$/);
     if(heard==='地下鉄')assert.equal(el('heardText').textContent,'ちかてつ');
-    assert.match(el('verdictSub').textContent,score===100?/훌륭/:score===0?/70% 이상/:/잘했어요/);
+    if (score === 100) assert.ok(perfectPraise.some(line => el('verdictSub').textContent.endsWith(line)));
+    else assert.match(el('verdictSub').textContent, score === 0 ? /70% 이상/ : /잘했어요/);
     assert.equal(el('diffLine').children.filter(child=>child.className==='bad').length,badCount);
     assert.equal(el('diffLine').children.slice(1).map(child=>child.textContent).join(''),'ちかてつ');
     const previousInstance=instance;

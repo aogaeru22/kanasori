@@ -8,7 +8,7 @@ export function createFeedbackVoice() {
     play(score) {
       this.stop();
       if (!window.Audio || !Number.isInteger(score) || score < 0 || score > 100) return;
-      audio = new window.Audio(`/audio/feedback/${score}.wav?v=7-even-audio`);
+      audio = new window.Audio(`/audio/feedback/${score}.wav?v=9-original-voice`);
       audio.volume = 1;
       void audio.play().catch(() => { /* Text feedback remains available when autoplay is blocked. */ });
     },

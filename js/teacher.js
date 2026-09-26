@@ -19,10 +19,11 @@ function openStudent(student) {
   $('chartTooltip').hidden = true;
 }
 function studentButton(student) { const button = el('button',student.name,'student-name'); button.onclick = () => openStudent(student); return button; }
+const classButtonName = group => group.id ? group.name.replace(/^3학년\s+/, '') : '3학년 전체';
 function classButtons() {
   $('classButtons').replaceChildren();
-  for (const group of [{id:'',name:'전체'},...classes]) {
-    const button = el('button',group.name); button.setAttribute('aria-pressed',String(group.id === classId));
+  for (const group of [{id:'',name:'3학년 전체'},...classes]) {
+    const button = el('button',classButtonName(group)); button.setAttribute('aria-pressed',String(group.id === classId));
     button.onclick = () => { classId = group.id; $('studentFilter').value = ''; classButtons(); students(); filter(); };
     $('classButtons').append(button);
   }
