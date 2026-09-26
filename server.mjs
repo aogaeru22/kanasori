@@ -84,7 +84,7 @@ export function createApp({ db = openStore(resolve(process.env.DATA_DIR || 'data
         if (!['GET', 'HEAD'].includes(req.method)) throw failure(405, '허용되지 않는 요청입니다.');
         const relative = path === '/' ? 'index.html' : path.slice(1);
         // Explicit public allowlist: never serve the database, server code, or config secrets.
-        const allowed = /^(attendance\.html|index\.html|app\.js|style\.css|teacher\.html|results\.html|js\/[a-z-]+\.js|css\/[a-z-]+\.css)$/.test(relative)
+        const allowed = /^(attendance\.html|index\.html|student-app\.js|style\.css|teacher\.html|results\.html|js\/[a-z-]+\.js|css\/[a-z-]+\.css)$/.test(relative)
           || /^kana\/(play\.html|catalog\.json|pronunciation-button\.png|[^.][^\\]*\.(swf|hwp))$/.test(relative)
           || /^fonts\/kyotai-w[234]\.woff2$/.test(relative)
           || /^audio\/feedback\/(?:[0-9]|[1-9][0-9]|100)\.wav$/.test(relative);
