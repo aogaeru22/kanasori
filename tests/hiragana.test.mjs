@@ -45,6 +45,7 @@ test('recognized words are rendered as actual hiragana, not copied from the targ
   assert.equal(promptedReading('えい','エイ'),'えい');
   assert.equal(promptedReading('えい','えー'),'えい');
   assert.equal(promptedReading('えい','에이'),'えい');
+  assert.equal(promptedReading('えい','애이'),'えい');
   assert.equal(promptedReading('えい','에에'),'えい');
   assert.equal(promptedReading('えい','ええ'),'えい');
   assert.equal(promptedReading('えい','え'),'えい');

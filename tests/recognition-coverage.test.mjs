@@ -34,9 +34,9 @@ test('all 10 rows and 46 words capture final/interim speech, retry, and use 70 p
    for(const target of targets){
      selected=target;el('micBtn').onclick();
      const morae=countMorae(target.reading);
-     const captureNow=singleWord && (morae===1 || target.reading==='えい');
+     const captureNow=singleWord && morae===1;
      assert.equal(instance.continuous,captureNow || !(singleWord && morae<=2));assert.equal(instance.interimResults,true);assert.equal(instance.maxAlternatives,5);
-     assert.equal(instance.lang,'ja-JP');
+     assert.equal(instance.lang,target.reading==='えい'?'ko-KR':'ja-JP');
      const interim=Object.assign([{transcript:target.reading}],{isFinal:false});
      const count=saved.length;instance.onresult({results:[interim]});
      if(captureNow){
@@ -121,15 +121,14 @@ test('all 10 rows and 46 words capture final/interim speech, retry, and use 70 p
  await flush();assert.equal(saved.at(-1).heard,'て');assert.equal(practice.busy,false);
  selected=wordTarget('a',2);
  assert.equal(selected.reading,'えい');
- // 에이 arrives after the short sound has already ended. Keep that same session.
+ // Korean 에이 is heard with ko-KR and saved as えい, like any other two-mora word.
  el('micBtn').onclick();
- assert.equal(instance.continuous,true);
- instance.onspeechend();
- await flush();assert.equal(practice.busy,true);
+ assert.equal(instance.continuous,false);
+ assert.equal(instance.lang,'ko-KR');
  instance.onresult({results:[Object.assign([{transcript:'에이'}],{isFinal:true})]});
  await flush();assert.equal(saved.at(-1).heard,'えい');assert.equal(el('scoreNum').textContent,'100%');assert.equal(practice.busy,false);
  el('micBtn').onclick();
- instance.onresult({results:[Object.assign([{transcript:'え'}],{isFinal:false})]});
+ instance.onresult({results:[Object.assign([{transcript:'애이'}],{isFinal:true})]});
  await flush();assert.equal(saved.at(-1).heard,'えい');assert.equal(el('scoreNum').textContent,'100%');assert.equal(practice.busy,false);
  el('micBtn').onclick();
  instance.onresult({results:[Object.assign([{transcript:'에이'}],{isFinal:true})]});
