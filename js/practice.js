@@ -128,10 +128,7 @@ export function setupPractice(getRow, { singleWord = false } = {}) {
     const oneMora = singleWord && morae === 1;
     const quick = singleWord && row.reading === 'め';
     const eSound = singleWord && row.reading === 'え';
-    // えい is spoken like a held え. Keep this session open, but do not cut it off
-    // at the first pause or the い never reaches the recognizer.
-    const eiWord = singleWord && row.reading === 'えい';
-    const hold = oneMora || eiWord;
+    const hold = oneMora;
     const settle = quick ? 400 : oneMora ? 1200 : 2500;
     const listeningHint = oneMora && !eSound
       ? '듣고 있어요… 한 글자는 조금 길게, 또박또박 읽어 주세요.'
@@ -184,13 +181,6 @@ export function setupPractice(getRow, { singleWord = false } = {}) {
       run.spoke = true;
       run.speechEnded = true;
       if (oneMora) { stop('flush'); return; }
-      if (eiWord) {
-        const said = promptedReading(row.reading, run.heard + run.interim);
-        if (said === row.reading) { stop('flush'); return; }
-        clearTimeout(run.silenceTimer);
-        run.silenceTimer = setTimeout(() => stop('flush'), 1600);
-        return;
-      }
       if (!(run.heard || run.interim) || run.settleArmed) return;
       clearTimeout(run.silenceTimer);
       run.silenceTimer = setTimeout(stop, settle);
@@ -276,8 +266,7 @@ export function setupPractice(getRow, { singleWord = false } = {}) {
       const kanaOnly = /^[ぁ-ゖ]+$/u.test(spoken) || (/[가-힣]/.test(spoken) && /^[ぁ-ゖ]+$/u.test(preview));
       if ($('heardText')) $('heardText').textContent = kanaOnly ? preview : '';
       if ($('heardBox')) $('heardBox').hidden = !kanaOnly;
-      const normalized = expandLongVowels(run.heard, row.reading).replace(/[\s、。，．,.!！?？]/g, '');
-      const partial = normalized.length > 0 && normalized.length < row.reading.length && row.reading.startsWith(normalized);
+      const partial = accepted.length > 0 && accepted.length < target.length && target.startsWith(accepted);
       // The session may already have ended before a one-kana transcript arrives.
       if (run.ended && (run.heard || run.interim)) { finish(); return; }
       if (singleWord && run.heard && !run.interim && !partial) stop();

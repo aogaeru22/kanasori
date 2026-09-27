@@ -34,7 +34,7 @@ test('all 10 rows and 46 words capture final/interim speech, retry, and use 70 p
    for(const target of targets){
      selected=target;el('micBtn').onclick();
      const morae=countMorae(target.reading);
-     const captureNow=singleWord && (morae===1 || target.reading==='えい');
+     const captureNow=singleWord && morae===1;
      assert.equal(instance.continuous,captureNow || !(singleWord && morae<=2));assert.equal(instance.interimResults,true);assert.equal(instance.maxAlternatives,5);
      assert.equal(instance.lang,'ja-JP');
      const interim=Object.assign([{transcript:target.reading}],{isFinal:false});
@@ -121,17 +121,15 @@ test('all 10 rows and 46 words capture final/interim speech, retry, and use 70 p
  await flush();assert.equal(saved.at(-1).heard,'て');assert.equal(practice.busy,false);
  selected=wordTarget('a',2);
  assert.equal(selected.reading,'えい');
- // えい is kept in one session, like え: a lone え stays open until えい arrives.
+ // えい uses the same capture as あい. The recognizer often returns only え.
  el('micBtn').onclick();
- assert.equal(instance.continuous,true);
- instance.onspeechend();
- await flush();assert.equal(practice.busy,true);assert.equal(instance.stops,0);
- instance.onresult({results:[Object.assign([{transcript:'えい'}],{isFinal:false})]});
+ assert.equal(instance.continuous,false);
+ const beforeEi=saved.length;
+ instance.onresult({results:[Object.assign([{transcript:'え'}],{isFinal:true})]});
  await flush();assert.equal(saved.at(-1).heard,'えい');assert.equal(el('scoreNum').textContent,'100%');assert.equal(practice.busy,false);
  el('micBtn').onclick();
- const beforeEi=saved.length;
  instance.onresult({results:[Object.assign([{transcript:'え'}],{isFinal:false})]});
- await flush();assert.equal(saved.length,beforeEi);assert.equal(practice.busy,true);
+ await flush();assert.equal(saved.length,beforeEi+1);assert.equal(practice.busy,true);
  instance.onresult({results:[Object.assign([{transcript:'えい'}],{isFinal:true})]});
  await flush();assert.equal(saved.at(-1).heard,'えい');assert.equal(el('scoreNum').textContent,'100%');assert.equal(practice.busy,false);
  el('micBtn').onclick();
