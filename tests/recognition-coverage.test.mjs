@@ -36,7 +36,7 @@ test('all 10 rows and 46 words capture final/interim speech, retry, and use 70 p
      const morae=countMorae(target.reading);
      const captureNow=singleWord && morae===1;
      assert.equal(instance.continuous,captureNow || !(singleWord && morae<=2));assert.equal(instance.interimResults,true);assert.equal(instance.maxAlternatives,5);
-     assert.equal(instance.lang,target.reading==='えい'?'ko-KR':'ja-JP');
+     assert.equal(instance.lang,'ja-JP');
      const interim=Object.assign([{transcript:target.reading}],{isFinal:false});
      const count=saved.length;instance.onresult({results:[interim]});
      if(captureNow){
@@ -121,10 +121,10 @@ test('all 10 rows and 46 words capture final/interim speech, retry, and use 70 p
  await flush();assert.equal(saved.at(-1).heard,'て');assert.equal(practice.busy,false);
  selected=wordTarget('a',2);
  assert.equal(selected.reading,'えい');
- // Korean 에이 is heard with ko-KR and saved as えい, like any other two-mora word.
+ // えい uses the same two-mora capture as あい.
  el('micBtn').onclick();
  assert.equal(instance.continuous,false);
- assert.equal(instance.lang,'ko-KR');
+ assert.equal(instance.lang,'ja-JP');
  instance.onresult({results:[Object.assign([{transcript:'에이'}],{isFinal:true})]});
  await flush();assert.equal(saved.at(-1).heard,'えい');assert.equal(el('scoreNum').textContent,'100%');assert.equal(practice.busy,false);
  el('micBtn').onclick();

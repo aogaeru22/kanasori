@@ -135,8 +135,7 @@ export function setupPractice(getRow, { singleWord = false } = {}) {
       : '듣고 있어요… 또박또박 말해보세요.';
     // え uses the same capture as と: keep the session open and save as soon
     // as the transcript reads as that one kana.
-    // ja-JP does not write down the Korean sound 에이. Listen for that word in Korean.
-    recognition.lang = singleWord && row.reading === 'えい' ? 'ko-KR' : 'ja-JP'; recognition.interimResults = true;
+    recognition.lang = 'ja-JP'; recognition.interimResults = true;
     recognition.continuous = hold || !(singleWord && morae <= 2); recognition.maxAlternatives = 5;
     const armLateResult = () => {
       if (run.finished || run.stopping || run.awaiting) return;
