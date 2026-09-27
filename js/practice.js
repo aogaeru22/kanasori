@@ -128,7 +128,8 @@ export function setupPractice(getRow, { singleWord = false } = {}) {
     const oneMora = singleWord && morae === 1;
     const quick = singleWord && row.reading === 'め';
     const eSound = singleWord && row.reading === 'え';
-    const hold = oneMora;
+    // 에이 is short, like え. A new session starts before that transcript arrives.
+    const hold = oneMora || (singleWord && row.reading === 'えい');
     const settle = quick ? 400 : oneMora ? 1200 : 2500;
     const listeningHint = oneMora && !eSound
       ? '듣고 있어요… 한 글자는 조금 길게, 또박또박 읽어 주세요.'
@@ -171,7 +172,7 @@ export function setupPractice(getRow, { singleWord = false } = {}) {
     recognition.onspeechstart = () => {
       if (run.finished || run.stopping) return;
       run.spoke = true;
-      if (run.ended || run.stopping || run.finished || run.settleArmed || oneMora) return;
+      if (run.ended || run.stopping || run.finished || run.settleArmed || hold) return;
       clearTimeout(run.silenceTimer);
     };
     recognition.onspeechend = () => {
@@ -180,7 +181,7 @@ export function setupPractice(getRow, { singleWord = false } = {}) {
       if (run.finished || run.stopping || run.stopMonitoring) return;
       run.spoke = true;
       run.speechEnded = true;
-      if (oneMora) { stop('flush'); return; }
+      if (hold) { stop('flush'); return; }
       if (!(run.heard || run.interim) || run.settleArmed) return;
       clearTimeout(run.silenceTimer);
       run.silenceTimer = setTimeout(stop, settle);
