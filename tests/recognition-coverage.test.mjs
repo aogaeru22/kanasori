@@ -143,6 +143,10 @@ test('all 10 rows and 46 words capture final/interim speech, retry, and use 70 p
  instance.onresult({results:[Object.assign([{transcript:'あい'},{transcript:'えい'}],{isFinal:true})]});
  await flush();assert.equal(saved.at(-1).heard,'えい');assert.equal(el('scoreNum').textContent,'100%');
  el('micBtn').onclick();
+ instance.onspeechstart();instance.onspeechend();instance.onend();
+ t.mock.timers.tick(2500);await flush();
+ assert.equal(saved.at(-1).heard,'えい');assert.equal(el('scoreNum').textContent,'100%');assert.equal(practice.busy,false);
+ el('micBtn').onclick();
  instance.onresult({results:[Object.assign([{transcript:'えんぴつ'}],{isFinal:true})]});
  await flush();assert.equal(saved.at(-1).heard,'えんぴつ');assert.notEqual(el('scoreNum').textContent,'100%');
  selected=wordTarget('a',0);assert.equal(selected.reading,'あい');

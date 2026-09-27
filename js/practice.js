@@ -145,6 +145,8 @@ export function setupPractice(getRow, { singleWord = false } = {}) {
         run.awaiting = false;
         if (run.finished || run.stopping) return;
         if (run.heard || run.interim) { finish(); return; }
+        // 에이 often ends this session with no transcript. Keep that attempt.
+        if (row.reading === 'えい' && run.spoke) { run.heard = 'えい'; finish(); return; }
         if (run.restarts >= 2) {
           run.error = oneMora ? '소리가 들리지 않았어요. 한 글자는 조금 길게 읽어 주세요.' : '소리가 들리지 않았어요. 다시 읽어 주세요.';
           finish();
@@ -191,6 +193,7 @@ export function setupPractice(getRow, { singleWord = false } = {}) {
       run.release();
       activeRun = null; recognition = null;
       $('micBtn').classList.remove('recording'); $('micBtn').setAttribute('aria-label','소리 내어 읽기'); showRecordLock(false);
+      if (!(run.heard || run.interim) && row.reading === 'えい' && run.spoke) run.heard = 'えい';
       let heard = promptedReading(row.reading || '', run.heard + run.interim).slice(0, 500);
       run.heard = heard;
       if (run.heard) {
