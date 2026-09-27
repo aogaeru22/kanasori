@@ -105,7 +105,8 @@ test('recognized words are rendered as actual hiragana, not copied from the targ
   assert.equal(await recognizedHiragana('町',wordTarget('ma',0)),'まち');
   assert.equal(await recognizedHiragana('待ち',wordTarget('ma',0)),'まち');
   assert.equal(await recognizedHiragana('耳',wordTarget('ma',1)),'みみ');
-  assert.equal(await recognizedHiragana('手',wordTarget('ta',3)),'て');
+  assert.equal(await recognizedHiragana('敵',wordTarget('ta',3)),'てき');
+  assert.equal(await recognizedHiragana('都市',wordTarget('ta',4)),'とし');
   assert.equal(await recognizedHiragana('目',wordTarget('ma',3)),'め');
 });
 

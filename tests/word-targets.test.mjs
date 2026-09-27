@@ -20,6 +20,8 @@ test('all 46 visible words have distinct, bounded selectable circles', () => {
     }
   }
   assert.equal(WORD_TARGETS.ta[1].reading,'ちかてつ');
+  assert.equal(WORD_TARGETS.ta[3].reading,'てき');
+  assert.equal(WORD_TARGETS.ta[4].reading,'とし');
   assert.ok(WORD_TARGETS.ta[1].x > 500); // Nested translation moves it from left to right.
   assert.equal(WORD_TARGETS.na[4].reading,'のき');
   assert.ok(WORD_TARGETS.na[4].x < 300);

@@ -234,9 +234,10 @@ export const WORD_TARGETS = {
     },
     {
       "reading": "ちかてつ",
-      "x": 549.95,
-      "y": 237.0,
-      "radius": 44.0
+      "x": 550.6,
+      "y": 236.975,
+      "radius": 44.2,
+      "radiusY": 44.175
     },
     {
       "reading": "つくえ",
@@ -245,13 +246,13 @@ export const WORD_TARGETS = {
       "radius": 44.0
     },
     {
-      "reading": "て",
+      "reading": "てき",
       "x": 306.0,
       "y": 415.95,
       "radius": 44.0
     },
     {
-      "reading": "と",
+      "reading": "とし",
       "x": 256.0,
       "y": 236.0,
       "radius": 44.0

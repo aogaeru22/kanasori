@@ -78,7 +78,7 @@ test('all 10 rows and 46 words capture final/interim speech, retry, and use 70 p
    }
    practice.clear();
  }
- const practice=setupPractice(()=>selected,{singleWord:true});await flush(); selected=wordTarget('ta',4);assert.equal(selected.reading,'と');
+ const practice=setupPractice(()=>selected,{singleWord:true});await flush(); selected={id:'legacy-to',reading:'と',ruby:'{戸|と}'};assert.equal(selected.reading,'と');
  el('micBtn').onclick();
  instance.onresult({results:[Object.assign([{transcript:'と'}],{isFinal:false})]});
  await flush();assert.equal(saved.at(-1).heard,'と');assert.equal(practice.busy,false);
@@ -119,7 +119,7 @@ test('all 10 rows and 46 words capture final/interim speech, retry, and use 70 p
  el('micBtn').onclick();
  instance.onresult({results:[Object.assign([{transcript:'め'}],{isFinal:false})]});
  await flush();assert.equal(saved.at(-1).heard,'め');assert.equal(practice.busy,false);
- selected=wordTarget('ta',3);assert.equal(selected.reading,'て');
+ selected={id:'legacy-te',reading:'て',ruby:'{手|て}'};assert.equal(selected.reading,'て');
  el('micBtn').onclick();
  instance.onresult({results:[Object.assign([{transcript:'て'}],{isFinal:true})]});
  await flush();assert.equal(saved.at(-1).heard,'て');assert.equal(practice.busy,false);
@@ -208,7 +208,7 @@ test('all 10 rows and 46 words capture final/interim speech, retry, and use 70 p
  selected=wordTarget('ma',1);assert.equal(selected.reading,'みみ');el('micBtn').onclick();
  instance.onresult({results:[Object.assign([{transcript:'み'}],{isFinal:true})]});
  instance.onend();await flush();assert.equal(saved.at(-1).heard,'みみ');assert.equal(el('scoreNum').textContent,'100%');
- selected=wordTarget('ta',3);assert.equal(selected.reading,'て');el('micBtn').onclick();
+ selected={id:'legacy-te',reading:'て',ruby:'{手|て}'};assert.equal(selected.reading,'て');el('micBtn').onclick();
  instance.onresult({results:[Object.assign([{transcript:'테'}],{isFinal:true})]});
  await flush();assert.equal(saved.at(-1).heard,'て');assert.equal(el('scoreNum').textContent,'100%');
  selected=wordTarget('a',0);el('micBtn').onclick();
