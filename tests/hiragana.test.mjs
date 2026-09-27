@@ -20,7 +20,7 @@ test('recognized words are rendered as actual hiragana, not copied from the targ
   assert.equal(await recognizedHiragana('えー',wordTarget('a',2)),'えい');
   assert.equal(await recognizedHiragana('에이',wordTarget('a',2)),'えい');
   assert.equal(await recognizedHiragana('へ',wordTarget('a',2)),'へ');
-  assert.equal(await recognizedHiragana('ええ',wordTarget('a',2)),'ええ');
+  assert.equal(await recognizedHiragana('ええ',wordTarget('a',2)),'えい');
   assert.equal(await recognizedHiragana('え',wordTarget('a',2)),'え');
   assert.equal(await recognizedHiragana('ひ',wordTarget('a',2)),'ひ');
   assert.equal(await recognizedHiragana('はい',wordTarget('ha',0)),'はい');
@@ -45,7 +45,7 @@ test('recognized words are rendered as actual hiragana, not copied from the targ
   assert.equal(promptedReading('えい','エイ'),'えい');
   assert.equal(promptedReading('えい','えー'),'えい');
   assert.equal(promptedReading('えい','에이'),'えい');
-  assert.equal(promptedReading('えい','ええ'),'ええ');
+  assert.equal(promptedReading('えい','ええ'),'えい');
   assert.equal(promptedReading('えい','え'),'え');
   assert.equal(promptedReading('えい','へ'),'へ');
   assert.equal(promptedReading('えい','에'),'에');

@@ -90,6 +90,8 @@ export function promptedReading(target, heard) {
   if (goal === 'に' && (text.startsWith('に') || /^(?:ん|2|二)+[いに]*$/.test(text) || /^[るり][うるい]*$/.test(text))) return goal;
   // 絵 is this word. A longer word that merely starts with え stays as spoken.
   if (goal === 'え' && text === '絵') return goal;
+  // えい is heard as a long え. えー is already expanded above. A lone え stays incomplete.
+  if (goal === 'えい' && text.length > 1 && /^え[えっい]*$/.test(text)) return goal;
   // ひ is heard as い or ふ, or extended into ひと / ひかり. はい and ふね stay unchanged.
   if (goal === 'ひ' && (text.startsWith('ひ') || /^い+$/.test(text) || /^[びぴ][いびぴ]*$/.test(text) || /^ふ[うふ]*$/.test(text))) return goal;
   return text;

@@ -128,6 +128,8 @@ export function setupPractice(getRow, { singleWord = false } = {}) {
     const oneMora = singleWord && morae === 1;
     const quick = singleWord && row.reading === 'め';
     const eSound = singleWord && row.reading === 'え';
+    // えい is spoken like a held え. A new recognition session drops that sound.
+    const hold = oneMora || (singleWord && row.reading === 'えい');
     const settle = quick ? 400 : oneMora ? 1200 : 2500;
     const listeningHint = oneMora && !eSound
       ? '듣고 있어요… 한 글자는 조금 길게, 또박또박 읽어 주세요.'
@@ -135,7 +137,7 @@ export function setupPractice(getRow, { singleWord = false } = {}) {
     // え uses the same capture as と: keep the session open and save as soon
     // as the transcript reads as that one kana.
     recognition.lang = 'ja-JP'; recognition.interimResults = true;
-    recognition.continuous = oneMora || !(singleWord && morae <= 2); recognition.maxAlternatives = 5;
+    recognition.continuous = hold || !(singleWord && morae <= 2); recognition.maxAlternatives = 5;
     const armLateResult = () => {
       if (run.finished || run.stopping || run.awaiting) return;
       run.awaiting = true;
@@ -170,7 +172,7 @@ export function setupPractice(getRow, { singleWord = false } = {}) {
     recognition.onspeechstart = () => {
       if (run.finished || run.stopping) return;
       run.spoke = true;
-      if (run.ended || run.stopping || run.finished || run.settleArmed || oneMora) return;
+      if (run.ended || run.stopping || run.finished || run.settleArmed || hold) return;
       clearTimeout(run.silenceTimer);
     };
     recognition.onspeechend = () => {
@@ -179,7 +181,7 @@ export function setupPractice(getRow, { singleWord = false } = {}) {
       if (run.finished || run.stopping || run.stopMonitoring) return;
       run.spoke = true;
       run.speechEnded = true;
-      if (oneMora) { stop('flush'); return; }
+      if (hold) { stop('flush'); return; }
       if (!(run.heard || run.interim) || run.settleArmed) return;
       clearTimeout(run.silenceTimer);
       run.silenceTimer = setTimeout(stop, settle);
@@ -250,7 +252,7 @@ export function setupPractice(getRow, { singleWord = false } = {}) {
       // Save a one-mora result, including え and と, once it reads as the
       // prompted kana. ひ often arrives first as し; that guess stays open
       // until い or ひと replaces it.
-      if (oneMora && accepted === target) {
+      if (hold && accepted === target) {
         const current = recognition;
         finish();
         try { current?.abort(); } catch { /* already finished */ }
@@ -282,8 +284,8 @@ export function setupPractice(getRow, { singleWord = false } = {}) {
     recognition.onerror = event => {
       if (run.finished || run.stopping) return;
       // Restarting immediately drops a transcript that arrives just after no-speech.
-      if (event.error === 'no-speech' && singleWord && !(run.heard || run.interim)) {
-        if (oneMora) return;
+        if (event.error === 'no-speech' && singleWord && !(run.heard || run.interim)) {
+        if (hold) return;
         armLateResult();
         return;
       }
@@ -301,7 +303,7 @@ export function setupPractice(getRow, { singleWord = false } = {}) {
         // start() would flicker the recorder and keep the next word instead.
         return;
       }
-      if (oneMora && !(run.heard || run.interim)) {
+      if (hold && !(run.heard || run.interim)) {
         if (run.spoke) return;
         clearTimeout(run.silenceTimer);
         run.settleArmed = false;
