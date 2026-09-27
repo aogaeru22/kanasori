@@ -110,6 +110,7 @@ test('recognized words are rendered as actual hiragana, not copied from the targ
   assert.equal(promptedReading('みみ','みー'),'みみ');
   assert.equal(promptedReading('みみ','みみず'),'みみ');
   assert.equal(promptedReading('め','み'),'み');
+  assert.equal(await recognizedHiragana('皮膚',wordTarget('ha',1)),'ひふ');
   assert.equal(await recognizedHiragana('肉',wordTarget('na',1)),'にく');
   assert.equal(await recognizedHiragana('軒',wordTarget('na',4)),'のき');
   assert.equal(await recognizedHiragana('町',wordTarget('ma',0)),'まち');
