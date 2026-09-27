@@ -39,6 +39,7 @@ const HANGUL_WORD = {
   て: /^(테에+|데에+|테+|데+)$/,
   てき: /^(테키|데키)$/,
   に: /^(니이+|니+)$/,
+  にく: /^(니쿠|니꾸)$/,
   め: /^(메에+|메+)$/,
   ひ: /^(?:히|이)+$/,
   のき: /^노키$/,
@@ -52,6 +53,7 @@ const ROMAJI_WORD = {
   て: /^te$/,
   てき: /^teki$/,
   に: /^ni$/,
+  にく: /^niku$/,
   め: /^me$/,
   ひ: /^hi+$/,
   のき: /^noki$/,
@@ -88,6 +90,8 @@ export function promptedReading(target, heard) {
   if (goal === 'て' && (/^て[えて]*$/.test(text) || /^で[えで]*$/.test(text))) return goal;
   // てき is written as the common word でき. て alone stays a different word.
   if (goal === 'てき' && /^[てで]っ?[きぎ][いき]*$/.test(text)) return goal;
+  // にく is written as にぐ. に alone stays a different word.
+  if (goal === 'にく' && /^にっ?[くぐ][うく]*$/.test(text)) return goal;
   if (goal === 'め' && /^め[えめ]*$/.test(text)) return goal;
   if (goal === 'と' && /^と[おと]*$/.test(text)) return goal;
   // The recognizer keeps extending に into には or にほん, or hears the mora as る or り.
