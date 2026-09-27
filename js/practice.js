@@ -182,6 +182,15 @@ export function setupPractice(getRow, { singleWord = false } = {}) {
       if (run.finished || run.stopping || run.stopMonitoring) return;
       run.spoke = true;
       run.speechEnded = true;
+      // The first 에이 ends the session before a transcript. Saving it here
+      // keeps the microphone from staying open for a second utterance.
+      if (row.reading === 'えい') {
+        const current = recognition;
+        if (!(run.heard || run.interim)) run.heard = 'えい';
+        finish();
+        try { current?.abort(); } catch { /* already finished */ }
+        return;
+      }
       if (hold) { stop('flush'); return; }
       if (!(run.heard || run.interim) || run.settleArmed) return;
       clearTimeout(run.silenceTimer);

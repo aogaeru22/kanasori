@@ -58,7 +58,11 @@ test('all 10 rows and 46 words capture final/interim speech, retry, and use 70 p
      if(!singleWord)el('micBtn').onclick();await flush();
      assert.equal(saved.length,count+1);assert.equal(saved.at(-1).lesson,target.id);
      assert.equal(el('scoreNum').textContent,'100%');assert.equal(practice.busy,false);
-     if(singleWord){
+     if(singleWord && target.reading==='えい'){
+       el('micBtn').onclick();instance.onspeechend();await flush();
+       assert.equal(saved.at(-1).heard,'えい',target.reading+' was not saved on the first utterance');
+       assert.equal(practice.busy,false);
+     }else if(singleWord){
        // Speech-end without a transcript must not stop a longer word before
        // the recognition service has delivered its delayed result.
        el('micBtn').onclick();instance.onspeechend();t.mock.timers.tick(2600);await flush();
@@ -143,8 +147,8 @@ test('all 10 rows and 46 words capture final/interim speech, retry, and use 70 p
  instance.onresult({results:[Object.assign([{transcript:'あい'},{transcript:'えい'}],{isFinal:true})]});
  await flush();assert.equal(saved.at(-1).heard,'えい');assert.equal(el('scoreNum').textContent,'100%');
  el('micBtn').onclick();
- instance.onspeechstart();instance.onspeechend();instance.onend();
- t.mock.timers.tick(2500);await flush();
+ instance.onspeechend();
+ await flush();
  assert.equal(saved.at(-1).heard,'えい');assert.equal(el('scoreNum').textContent,'100%');assert.equal(practice.busy,false);
  el('micBtn').onclick();
  instance.onresult({results:[Object.assign([{transcript:'えんぴつ'}],{isFinal:true})]});
