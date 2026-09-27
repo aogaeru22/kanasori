@@ -352,7 +352,8 @@
       splashScreen: false,
       showSwfDownload: false,
       scale: "showAll",
-      warnOnUnsupportedContent: false
+      warnOnUnsupportedContent: false,
+      deviceFontRenderer: "canvas"
     };
     window.doInitialize = function () { return true; };
     window.doTerminate = function () { return true; };
@@ -599,12 +600,14 @@
       player.style.height = "100%";
       stage.append(player);
       const source = wordMode ? `voca_practice_hiragana/${selectedRow.id}행${selectedRow.id === 'wa' ? '_n' : ''}.swf` : file;
-      player.load(source + "?v=14-a-ei").then(() => {
+      const open = () => player.load(source + "?v=14-a-ei").then(() => {
         const row = ROWS.find((item) => item.file === file);
         setStatus(row ? row.kana + "행" : pageLabel(file));
       }).catch((error) => {
         setStatus("이 쪽을 열지 못했습니다. " + (error && error.message ? error.message : ""), true);
       });
+      const fontsReady = document.fonts?.load ? document.fonts.load('29px "MS PGothic"') : Promise.resolve();
+      fontsReady.then(open, open);
     }
 
     function locate(file) {

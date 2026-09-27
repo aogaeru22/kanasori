@@ -1,6 +1,7 @@
 @font-face{font-family:KanaKyotai;src:url('/fonts/kyotai-w2.woff2') format('woff2');font-style:normal;font-weight:100 300;font-display:swap;unicode-range:U+3000-30FF,U+31F0-31FF,U+3400-4DBF,U+4E00-9FFF,U+FF00-FFEF}
 @font-face{font-family:KanaKyotai;src:url('/fonts/kyotai-w3.woff2') format('woff2');font-style:normal;font-weight:400 500;font-display:swap;unicode-range:U+3000-30FF,U+31F0-31FF,U+3400-4DBF,U+4E00-9FFF,U+FF00-FFEF}
 @font-face{font-family:KanaKyotai;src:url('/fonts/kyotai-w4.woff2') format('woff2');font-style:normal;font-weight:600 900;font-display:swap;unicode-range:U+3000-30FF,U+31F0-31FF,U+3400-4DBF,U+4E00-9FFF,U+FF00-FFEF}
+@font-face{font-family:"MS PGothic";src:url('/fonts/kyotai-w3.woff2') format('woff2');font-style:normal;font-weight:400;font-display:swap;unicode-range:U+3000-30FF,U+31F0-31FF,U+3400-4DBF,U+4E00-9FFF,U+FF00-FFEF}
 /* KanaKyotai covers Japanese only. Korean uses the chalkboard hand. */
 body,button,input,select,textarea,h1,h2,h3,p,a,span,b,strong,small,td,th,summary,svg text,[lang=ja]{font-family:KanaKyotai,'Gaegu',cursive}
 .intro h1,.wordmark,.brand{font-family:KanaKyotai,'Gaegu',cursive}
