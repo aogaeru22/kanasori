@@ -137,7 +137,7 @@ export const WORD_TARGETS = {
       "radius": 44.0
     },
     {
-      "reading": "に",
+      "reading": "にく",
       "x": 544.95,
       "y": 237.0,
       "radius": 44.0

@@ -85,7 +85,7 @@ test('all 10 rows and 46 words capture final/interim speech, retry, and use 70 p
  el('micBtn').onclick();
  instance.onresult({results:[Object.assign([{transcript:'とお'}],{isFinal:false})]});
  await flush();assert.equal(saved.at(-1).heard,'と');assert.equal(practice.busy,false);
- selected=wordTarget('na',1);assert.equal(selected.reading,'に');
+ selected={id:'legacy-ni',reading:'に',ruby:'{二|に}{2|に}'};assert.equal(selected.reading,'に');
  el('micBtn').onclick();
  instance.onresult({results:[Object.assign([{transcript:'にほ'}],{isFinal:false})]});
  await flush();assert.equal(saved.at(-1).heard,'に');assert.equal(practice.busy,false);
