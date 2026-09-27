@@ -35,6 +35,7 @@ const H_ONSET = { は: 'あ', ひ: 'い', ふ: 'う', へ: 'え', ほ: 'お' };
 // A different word is left unchanged.
 const HANGUL_WORD = {
   え: /^에+$/,
+  えい: /^에이$/,
   て: /^(테에+|데에+|테+|데+)$/,
   に: /^(니이+|니+)$/,
   め: /^(메에+|메+)$/,
@@ -46,6 +47,7 @@ const HANGUL_WORD = {
 };
 const ROMAJI_WORD = {
   え: /^(e|eh|ee)$/,
+  えい: /^ei$/,
   て: /^te$/,
   に: /^ni$/,
   め: /^me$/,

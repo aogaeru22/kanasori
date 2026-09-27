@@ -5,6 +5,7 @@ Never use the hit-state text, which contains stale words from the source templat
 """
 import json
 import pathlib
+import re
 import struct
 import zlib
 from _swf_matrix import Bits, iter_tags, read_matrix, read_rect_end
@@ -26,6 +27,30 @@ def frame(b):
 def translate(m):
     assert m['scale'] is None and m['rotate'] is None
     return m['translate'][:2]
+
+def edit_text(body):
+    pos = 2 + read_rect_end(body[2:])
+    bits = Bits(body[pos:])
+    flags = [bits.get(1) for _ in range(16)]
+    pos += 2
+    has_text, has_color, has_max, has_font, has_class, has_layout = flags[0], flags[5], flags[6], flags[7], flags[8], flags[10]
+    if has_font:
+        pos += 2
+    if has_class:
+        pos = body.index(0, pos) + 1
+    if has_font:
+        pos += 2
+    if has_color:
+        pos += 4
+    if has_max:
+        pos += 2
+    if has_layout:
+        pos += 9
+    pos = body.index(0, pos) + 1
+    if not has_text:
+        return ''
+    end = body.index(0, pos)
+    return re.sub(r'<[^>]+>', '', body[pos:end].decode('utf-8', 'replace'))
 
 def extract(path):
     raw = zlib.decompress(path.read_bytes()[8:])
@@ -76,6 +101,10 @@ def extract(path):
                 bits.get_signed(ab)
             pos += (bits.bit+7)//8
         texts[cid] = word
+    if not any(code in (11, 33) for code, _, _ in tags):
+        for code, _, body in tags:
+            if code == 37:
+                texts[u16(body)] = edit_text(body)
 
     words = []
     for cid, matrix in frame(raw):

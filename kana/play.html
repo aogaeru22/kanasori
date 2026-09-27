@@ -599,7 +599,7 @@
       player.style.height = "100%";
       stage.append(player);
       const source = wordMode ? `voca_practice_hiragana/${selectedRow.id}행${selectedRow.id === 'wa' ? '_n' : ''}.swf` : file;
-      player.load(source + "?v=13-clean-a-endpoint").then(() => {
+      player.load(source + "?v=14-a-ei").then(() => {
         const row = ROWS.find((item) => item.file === file);
         setStatus(row ? row.kana + "행" : pageLabel(file));
       }).catch((error) => {
