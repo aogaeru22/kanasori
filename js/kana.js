@@ -37,7 +37,7 @@ const HANGUL_WORD = {
   え: /^에+$/,
   えい: /^(에이|애이|예이|에잇|헤이|에+)$/,
   て: /^(테에+|데에+|테+|데+)$/,
-  てき: /^(테키|데키)$/,
+  てき: /^(테키|데키|테이키|텐키|덴키)$/,
   に: /^(니이+|니+)$/,
   にく: /^(니쿠|니꾸|미쿠|리쿠)$/,
   め: /^(메에+|메+)$/,
@@ -88,8 +88,8 @@ export function promptedReading(target, heard) {
   if (goal.length === 1 && (text === `${goal}っ` || (goal !== 'え' && text === `${goal}い`))) return goal;
   // A held て is written てえ, and て is often heard as で. と does not have that swap.
   if (goal === 'て' && (/^て[えて]*$/.test(text) || /^で[えで]*$/.test(text))) return goal;
-  // てき is written as the common word でき. て alone stays a different word.
-  if (goal === 'てき' && /^[てで]っ?[きぎ][いき]*$/.test(text)) return goal;
+  // てき is heard as でき, ていき, てんき, or できる. て alone stays different.
+  if (goal === 'てき' && ((/^[てで]っ?[きぎんい]{1,3}$/.test(text) && /[きぎ]/.test(text)) || text === 'できる')) return goal;
   // にく is heard as にくい, にいく, みく, or りく. に alone stays different.
   if (goal === 'にく' && ((/^にっ?[くぐいう]{1,3}$/.test(text) && /[くぐ]/.test(text)) || /^[みりじび]く$/.test(text))) return goal;
   if (goal === 'め' && /^め[えめ]*$/.test(text)) return goal;
