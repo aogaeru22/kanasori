@@ -124,6 +124,11 @@ test('all 10 rows and 46 words capture final/interim speech, retry, and use 70 p
  // えい is kept in one session, like え: a lone え stays open until えい arrives.
  el('micBtn').onclick();
  assert.equal(instance.continuous,true);
+ instance.onspeechend();
+ await flush();assert.equal(practice.busy,true);assert.equal(instance.stops,0);
+ instance.onresult({results:[Object.assign([{transcript:'えい'}],{isFinal:false})]});
+ await flush();assert.equal(saved.at(-1).heard,'えい');assert.equal(el('scoreNum').textContent,'100%');assert.equal(practice.busy,false);
+ el('micBtn').onclick();
  const beforeEi=saved.length;
  instance.onresult({results:[Object.assign([{transcript:'え'}],{isFinal:false})]});
  await flush();assert.equal(saved.length,beforeEi);assert.equal(practice.busy,true);
