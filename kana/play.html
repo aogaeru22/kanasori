@@ -422,7 +422,7 @@
     import { renderWarningIcons } from "../js/warning-icons.js";
     import { LESSONS } from "../js/lessons.js";
     import { setupPractice } from "../js/practice.js?v=68";
-    import { WORD_TARGETS, wordTarget } from "../js/word-targets.js?v=18-ha";
+    import { WORD_TARGETS, wordTarget } from "../js/word-targets.js?v=19-ma";
     const lessonsEl = document.getElementById("lessons");
     const sectionsEl = document.getElementById("sections");
     const pagesEl = document.getElementById("pages");
@@ -600,7 +600,7 @@
       player.style.height = "100%";
       stage.append(player);
       const source = wordMode ? `voca_practice_hiragana/${selectedRow.id}행${selectedRow.id === 'wa' ? '_n' : ''}.swf` : file;
-      const open = () => player.load(source + "?v=18-ha").then(() => {
+      const open = () => player.load(source + "?v=19-ma").then(() => {
         const row = ROWS.find((item) => item.file === file);
         setStatus(row ? row.kana + "행" : pageLabel(file));
       }).catch((error) => {

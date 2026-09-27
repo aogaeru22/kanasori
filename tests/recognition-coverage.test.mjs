@@ -115,7 +115,7 @@ test('all 10 rows and 46 words capture final/interim speech, retry, and use 70 p
  await flush();assert.equal(practice.busy,true);assert.equal(instance.starts,hiStarts);
  instance.onresult({results:[Object.assign([{transcript:'ふ'}],{isFinal:true})]});
  await flush();assert.equal(saved.at(-1).heard,'ひ');assert.equal(practice.busy,false);
- selected=wordTarget('ma',3);assert.equal(selected.reading,'め');
+ selected={id:'legacy-me',reading:'め',ruby:'{目|め}'};assert.equal(selected.reading,'め');
  el('micBtn').onclick();
  instance.onresult({results:[Object.assign([{transcript:'め'}],{isFinal:false})]});
  await flush();assert.equal(saved.at(-1).heard,'め');assert.equal(practice.busy,false);

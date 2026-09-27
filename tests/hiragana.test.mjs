@@ -118,7 +118,7 @@ test('recognized words are rendered as actual hiragana, not copied from the targ
   assert.equal(await recognizedHiragana('耳',wordTarget('ma',1)),'みみ');
   assert.equal(await recognizedHiragana('敵',wordTarget('ta',3)),'てき');
   assert.equal(await recognizedHiragana('都市',wordTarget('ta',4)),'とし');
-  assert.equal(await recognizedHiragana('目',wordTarget('ma',3)),'め');
+  assert.equal(await recognizedHiragana('飯',wordTarget('ma',3)),'めし');
 });
 
 test('long-vowel notation preserves morae but does not claim acoustic timing assessment', async () => {
