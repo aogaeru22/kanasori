@@ -1,6 +1,6 @@
 import { api } from './api.js';
 import { assess } from './score.js';
-import { expandLongVowels, countMorae, promptedReading } from './kana.js';
+import { expandLongVowels, countMorae, promptedReading } from './kana.js?v=66';
 import { PASS_THRESHOLD } from './lessons.js';
 import { createFeedbackVoice } from './feedback-voice.js';
 

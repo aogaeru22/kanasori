@@ -37,6 +37,7 @@ const HANGUL_WORD = {
   え: /^에+$/,
   えい: /^(에이|애이|예이|에잇|헤이|에+)$/,
   て: /^(테에+|데에+|테+|데+)$/,
+  てき: /^(테키|데키)$/,
   に: /^(니이+|니+)$/,
   め: /^(메에+|메+)$/,
   ひ: /^(?:히|이)+$/,
@@ -49,6 +50,7 @@ const ROMAJI_WORD = {
   え: /^(e|eh|ee)$/,
   えい: /^ei$/,
   て: /^te$/,
+  てき: /^teki$/,
   に: /^ni$/,
   め: /^me$/,
   ひ: /^hi+$/,
@@ -84,6 +86,8 @@ export function promptedReading(target, heard) {
   if (goal.length === 1 && (text === `${goal}っ` || (goal !== 'え' && text === `${goal}い`))) return goal;
   // A held て is written てえ, and て is often heard as で. と does not have that swap.
   if (goal === 'て' && (/^て[えて]*$/.test(text) || /^で[えで]*$/.test(text))) return goal;
+  // てき is written as the common word でき. て alone stays a different word.
+  if (goal === 'てき' && /^[てで]っ?[きぎ][いき]*$/.test(text)) return goal;
   if (goal === 'め' && /^め[えめ]*$/.test(text)) return goal;
   if (goal === 'と' && /^と[おと]*$/.test(text)) return goal;
   // The recognizer keeps extending に into には or にほん, or hears the mora as る or り.
