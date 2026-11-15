@@ -149,37 +149,24 @@
       touch-action: none;
     }
     .stage ruffle-player, .stage ruffle-object { width: 100%; height: 100%; display: block; touch-action: none; }
-    /* Keep the white ink layer inside the Flash pad so the gray bezel stays visible.
-       Right edge was bleeding past the frame — inset more on the right. */
+    /* Transparent ink layer over Flash pad — only strokes are drawn so the
+       gray frame stays seamless (no white/gray overlay seams on the right). */
     .write-pad {
       position: absolute;
       z-index: 4;
-      left: calc(432 / 800 * 100%);
-      top: calc((276 - 71) / 409 * 100%);
-      width: calc((648 - 432) / 800 * 100%);
-      height: calc((414 - 276) / 409 * 100%);
+      left: calc(430 / 800 * 100%);
+      top: calc((275 - 71) / 409 * 100%);
+      width: calc((660 - 430) / 800 * 100%);
+      height: calc((415 - 275) / 409 * 100%);
       touch-action: none;
       cursor: crosshair;
-      background: #fff;
+      background: transparent;
       border: 0;
       padding: 0;
       display: none;
       box-sizing: border-box;
     }
     body.writing .write-pad { display: block; }
-    /* Restore the right gray bezel if any white bleed remains. */
-    .write-frame-right {
-      position: absolute;
-      z-index: 5;
-      left: calc(668 / 800 * 100%);
-      top: calc((258 - 71) / 409 * 100%);
-      width: calc((690 - 668) / 800 * 100%);
-      height: calc((448 - 258) / 409 * 100%);
-      background: #d7d7d7;
-      pointer-events: none;
-      display: none;
-    }
-    body.writing .write-frame-right { display: block; }
     .lesson-title {
       position: absolute;
       z-index: 6;
@@ -450,7 +437,6 @@
     <div class="stage-wrap">
       <div class="stage" id="stage"></div>
       <canvas class="write-pad" id="writePad" aria-label="글자 쓰기판"></canvas>
-      <div class="write-frame-right" aria-hidden="true"></div>
       <div class="lesson-title" aria-label="학습 제목"><span id="lessonRowTitle"></span><span class="lesson-title-suffix">발음</span></div>
       <a class="pronunciation-link" id="pronunciationLink" href="#"><img src="pronunciation-button.png?v=1" alt="발음 연습"></a>
       <div class="status" id="status">자료를 불러오는 중입니다.</div>
@@ -663,7 +649,7 @@
     const writePadApi = (() => {
       const MIN_STEP = 0.0015;
       const TELEPORT = 0.2;
-      const ctx = writePad.getContext('2d', { alpha: false }) || writePad.getContext('2d');
+      const ctx = writePad.getContext('2d', { alpha: true }) || writePad.getContext('2d');
       let strokes = [];
       let current = [];
       let drawing = false;
@@ -709,8 +695,8 @@
         penReady = false;
         const width = writePad.width;
         const height = writePad.height;
-        ctx.fillStyle = '#fff';
-        ctx.fillRect(0, 0, width, height);
+        // Clear to transparent so Flash board + gray frame show through.
+        ctx.clearRect(0, 0, width, height);
         applyPen();
         for (const stroke of strokes) {
           if (!stroke.length) continue;
@@ -835,8 +821,6 @@
         resize,
         setActive: active => {
           writePad.style.display = active ? 'block' : 'none';
-          const frameRight = document.querySelector('.write-frame-right');
-          if (frameRight) frameRight.style.display = active ? 'block' : 'none';
           if (!active) clear();
           else resize();
         },
