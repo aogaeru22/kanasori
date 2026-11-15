@@ -165,14 +165,14 @@
       display: none;
     }
     body.writing .write-pad { display: block; }
-    /* Cover leftover toolbar divider baked into the board chrome. */
+    /* Narrow cover for leftover divider only — must not overlap 화면지우기 (~546±32). */
     .write-toolbar-cover {
       position: absolute;
       z-index: 5;
-      left: calc(548 / 800 * 100%);
-      top: calc((434 - 71) / 409 * 100%);
-      width: calc(74 / 800 * 100%);
-      height: calc(24 / 409 * 100%);
+      left: calc(585 / 800 * 100%);
+      top: calc((436 - 71) / 409 * 100%);
+      width: calc(8 / 800 * 100%);
+      height: calc(20 / 409 * 100%);
       background: #d7d7d7;
       pointer-events: none;
       display: none;
@@ -686,7 +686,8 @@
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
         ctx.strokeStyle = '#1a1a1a';
-        ctx.lineWidth = Math.max(5, writePad.width * 0.015);
+        // Match former Flash 3pt (penSize 8) stroke weight.
+        ctx.lineWidth = Math.max(10, writePad.width * 0.034);
         penReady = true;
       };
       const strokePath = (points, width, height) => {
