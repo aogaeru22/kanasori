@@ -87,7 +87,7 @@
       color: #243e66;
       font-variant-numeric: tabular-nums;
     }
-    .lesson-fit { zoom: var(--lesson-zoom, 1); }
+    :root { --lesson-zoom: 1; }
     #saveRetry { margin:8px; }
     .mic-hint { max-width:90vw; }
     header, .bar, .pages, .status { display: none; }
@@ -118,13 +118,13 @@
       container-type: inline-size;
       display: flex;
       gap: 6px;
-      width: min(calc(100vw - 20px), calc((100dvh - var(--below) - 64px) * 800 / 409));
+      width: min(calc((100vw - 20px) * var(--lesson-zoom)), calc((100dvh - var(--below) - 64px) * var(--lesson-zoom) * 800 / 409));
       margin: 0 auto 8px;
     }
     .row-tab {
       flex: 1;
       min-width: 0;
-      height: 50px;
+      height: calc(50px * var(--lesson-zoom));
       display: flex;
       flex-direction: row;
       align-items: center;
@@ -164,12 +164,12 @@
     .row-tab:focus-visible { outline: 3px solid #c4552a; outline-offset: 3px; }
     @media (max-width: 480px) {
       .kana-tabs { gap: 4px; }
-      .row-tab { height: 54px; flex-direction: column; gap: 3px; padding: 3px 0; border-radius: 10px; }
+      .row-tab { height: calc(54px * var(--lesson-zoom)); flex-direction: column; gap: 3px; padding: 3px 0; border-radius: 10px; }
       .row-tab .kana { font-size: 25px; }
       .row-tab .suffix { margin-top: 0; font-size: 9px; }
     }
     @container (max-width: 480px) {
-      .row-tab { height: 54px; flex-direction: column; gap: 3px; padding: 3px 0; border-radius: 10px; }
+      .row-tab { height: calc(54px * var(--lesson-zoom)); flex-direction: column; gap: 3px; padding: 3px 0; border-radius: 10px; }
       .row-tab .kana { font-size: clamp(15px, 6cqw, 25px); }
       .row-tab .suffix { margin-top: 0; font-size: 9px; }
     }
@@ -186,7 +186,7 @@
     .pages button.active { background: var(--persimmon); border-color: var(--persimmon); }
     .stage-wrap {
       container-type: inline-size;
-      width: min(calc(100vw - 20px), calc((100dvh - var(--below) - 64px) * 800 / 409));
+      width: min(calc((100vw - 20px) * var(--lesson-zoom)), calc((100dvh - var(--below) - 64px) * var(--lesson-zoom) * 800 / 409));
       aspect-ratio: 800 / 409;
       margin: 0 auto;
       overflow: hidden;
@@ -253,9 +253,11 @@
       padding: 0 8px 8px; container-type: size;
     }
     body.writing .kana-tabs,
-    body.writing .stage-wrap { width: min(100cqw, calc((100cqh - 64px) * 800 / 409)); }
+    body.writing .stage-wrap {
+      width: min(calc(100cqw * var(--lesson-zoom)), calc((100cqh - 64px) * var(--lesson-zoom) * 800 / 409));
+    }
     body.writing .kana-tabs { margin: 0 auto 6px; }
-    body.writing .stage-wrap { max-height: calc(100cqh - 64px); }
+    body.writing .stage-wrap { max-height: calc((100cqh - 64px) * var(--lesson-zoom)); }
     body.writing .recorder, body.writing .practice-navigation { display: none; }
     .pronunciation-link {
       position: absolute; right: .8%; bottom: 2.2%; width: 9%;
@@ -299,7 +301,12 @@
       pointer-events: none;
     }
     body.words, body.words.scored { --below: 310px; height: auto; min-height: 100dvh; }
-    body.words .stage-wrap { width: min(calc(100vw - 20px), max(300px, calc((100dvh - 310px - 64px) * 800 / 409))); }
+    body.words .stage-wrap {
+      width: min(
+        calc((100vw - 20px) * var(--lesson-zoom)),
+        max(calc(300px * var(--lesson-zoom)), calc((100dvh - 310px - 64px) * var(--lesson-zoom) * 800 / 409))
+      );
+    }
     body.words .recorder { width: min(calc(100vw - 20px), 560px); }
     body.words .lesson-title { width: 36%; height: 15%; padding-left: 3.2%; }
     .practice-navigation { display: flex; justify-content: center; gap: 12px; margin: 12px auto; }
@@ -1000,7 +1007,10 @@
       zoomOutBtn.disabled = lessonZoom <= ZOOM_STEPS[0];
       zoomInBtn.disabled = lessonZoom >= ZOOM_STEPS[ZOOM_STEPS.length - 1];
       localStorage.setItem(ZOOM_KEY, String(lessonZoom));
-      if (!wordMode) requestAnimationFrame(() => writePadApi.resize());
+      requestAnimationFrame(() => {
+        window.dispatchEvent(new Event('resize'));
+        if (!wordMode) writePadApi.resize();
+      });
     };
     zoomOutBtn.addEventListener('click', () => {
       const index = ZOOM_STEPS.indexOf(lessonZoom);
