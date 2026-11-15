@@ -140,6 +140,17 @@ tbody tr:hover { background:#f5f5dc07; }
 .blue { background:var(--yellow); }.red { background:var(--red); }
 .learning-nav { padding-inline:18px; }
 .row-tab { background:#f5f5dc09; color:var(--chalk); border-color:#f5f5dc70; border-radius:7px 11px 6px 8px; }
+.script-tabs button {
+  color:var(--chalk);
+  background:#f5f5dc12;
+  border:1px solid #f5f5dc70;
+}
+.script-tabs button.active,
+.script-tabs button[aria-pressed=true] {
+  background:#ffd70018;
+  color:var(--yellow);
+  border:2px solid var(--yellow);
+}
 .row-tab .suffix,.row-tab.active .suffix { color:var(--muted); }
 .stage-wrap { border:2px solid #b89867; border-radius:9px; box-shadow:0 8px 20px #10241640; overflow:hidden; }
 /* Flash contains the original stroke movies on a white teaching sheet. */
