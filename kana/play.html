@@ -645,9 +645,9 @@
     // strokes through Ruffle — that caused inter-stroke connectors on Chromebooks.
     const writePad = document.getElementById('writePad');
     const writePadApi = (() => {
-      const MIN_STEP = 0.004;
-      const START_MOVE = 0.01;
-      const TELEPORT = 0.14;
+      const MIN_STEP = 0.0025;
+      const START_MOVE = 0.003;
+      const TELEPORT = 0.16;
       const COLORS = {
         orangeBtn: '#e87a2f',
         blueBtn: '#2f6fe8',
@@ -663,6 +663,8 @@
         { id: 'blackBtn', x: 531.3, y: 446.9, r: 14 },
         { id: 'clearBtn', x: 619.0, y: 443.1, r: 36 },
       ];
+      const hasRaw = 'onpointerrawupdate' in window;
+      const ctx = writePad.getContext('2d', { alpha: false, desynchronized: true }) || writePad.getContext('2d');
       let strokes = [];
       let current = [];
       let drawing = false;
@@ -670,103 +672,114 @@
       let pointerId = null;
       let origin = null;
       let color = COLORS.blackBtn;
-      let paintQueued = false;
+      let padRect = null;
+      let lastInk = null;
       const clamp01 = value => Math.max(0, Math.min(1, value));
       const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
+      const lineWidth = () => Math.max(5.5, writePad.width * 0.016);
+      const refreshRect = () => { padRect = writePad.getBoundingClientRect(); };
       const pointFromEvent = event => {
-        const rect = writePad.getBoundingClientRect();
+        const rect = padRect || writePad.getBoundingClientRect();
         if (!rect.width || !rect.height) return null;
-        if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) {
-          return null;
-        }
         return {
           x: clamp01((event.clientX - rect.left) / rect.width),
           y: clamp01((event.clientY - rect.top) / rect.height),
         };
       };
-      const strokePath = (ctx, points, width, height) => {
+      const strokePath = (context, points, width, height) => {
         if (!points.length) return;
-        ctx.beginPath();
-        ctx.moveTo(points[0].x * width, points[0].y * height);
+        context.beginPath();
+        context.moveTo(points[0].x * width, points[0].y * height);
         if (points.length === 1) {
-          ctx.lineTo(points[0].x * width + 0.01, points[0].y * height);
+          context.lineTo(points[0].x * width + 0.01, points[0].y * height);
           return;
         }
         if (points.length === 2) {
-          ctx.lineTo(points[1].x * width, points[1].y * height);
+          context.lineTo(points[1].x * width, points[1].y * height);
           return;
         }
         for (let i = 1; i < points.length - 1; i += 1) {
           const a = points[i];
           const b = points[i + 1];
-          ctx.quadraticCurveTo(a.x * width, a.y * height, ((a.x + b.x) / 2) * width, ((a.y + b.y) / 2) * height);
+          context.quadraticCurveTo(a.x * width, a.y * height, ((a.x + b.x) / 2) * width, ((a.y + b.y) / 2) * height);
         }
         const last = points[points.length - 1];
-        ctx.lineTo(last.x * width, last.y * height);
+        context.lineTo(last.x * width, last.y * height);
       };
-      const paint = () => {
-        const ctx = writePad.getContext('2d');
+      const stylePen = (strokeColor) => {
+        if (!ctx) return;
+        ctx.lineCap = 'round';
+        ctx.lineJoin = 'round';
+        ctx.strokeStyle = strokeColor;
+        ctx.lineWidth = lineWidth();
+      };
+      const paintAll = () => {
         if (!ctx) return;
         const width = writePad.width;
         const height = writePad.height;
-        ctx.clearRect(0, 0, width, height);
         ctx.fillStyle = '#fff';
         ctx.fillRect(0, 0, width, height);
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-        ctx.lineWidth = Math.max(6, width * 0.018);
         for (const stroke of strokes) {
           if (!stroke.points.length) continue;
-          ctx.strokeStyle = stroke.color;
+          stylePen(stroke.color);
           strokePath(ctx, stroke.points, width, height);
           ctx.stroke();
         }
         if (current.length) {
-          ctx.strokeStyle = color;
+          stylePen(color);
           strokePath(ctx, current, width, height);
           ctx.stroke();
         }
       };
-      const queuePaint = () => {
-        if (paintQueued) return;
-        paintQueued = true;
-        requestAnimationFrame(() => {
-          paintQueued = false;
-          paint();
-        });
+      const inkSegment = (from, to) => {
+        if (!ctx || !from || !to) return;
+        const width = writePad.width;
+        const height = writePad.height;
+        stylePen(color);
+        ctx.beginPath();
+        ctx.moveTo(from.x * width, from.y * height);
+        ctx.lineTo(to.x * width, to.y * height);
+        ctx.stroke();
       };
       const resize = () => {
-        const rect = writePad.getBoundingClientRect();
+        refreshRect();
         const dpr = Math.min(window.devicePixelRatio || 1, 2);
-        const nextW = Math.max(1, Math.round(rect.width * dpr));
-        const nextH = Math.max(1, Math.round(rect.height * dpr));
+        const nextW = Math.max(1, Math.round((padRect?.width || 1) * dpr));
+        const nextH = Math.max(1, Math.round((padRect?.height || 1) * dpr));
         if (writePad.width !== nextW || writePad.height !== nextH) {
           writePad.width = nextW;
           writePad.height = nextH;
         }
-        paint();
+        paintAll();
       };
       const pushPoint = point => {
         const last = current[current.length - 1];
         if (!last) {
           current.push(point);
-          return;
+          lastInk = point;
+          return true;
         }
         const gap = dist(last, point);
-        if (gap < MIN_STEP) return;
+        if (gap < MIN_STEP) return false;
         if (gap > TELEPORT) {
-          current.length = 0;
           current.push(point);
-          return;
+          lastInk = point;
+          return false;
         }
-        if (gap > MIN_STEP * 2.5) {
-          const steps = Math.min(8, Math.floor(gap / MIN_STEP));
+        if (gap > MIN_STEP * 3) {
+          const steps = Math.min(6, Math.floor(gap / MIN_STEP));
           for (let step = 1; step < steps; step += 1) {
             const t = step / steps;
-            current.push({ x: last.x + (point.x - last.x) * t, y: last.y + (point.y - last.y) * t });
+            const mid = { x: last.x + (point.x - last.x) * t, y: last.y + (point.y - last.y) * t };
+            current.push(mid);
+            inkSegment(lastInk, mid);
+            lastInk = mid;
           }
         }
         current.push(point);
+        inkSegment(lastInk, point);
+        lastInk = point;
+        return true;
       };
       const isPenDown = event => {
         if (!event.isPrimary) return false;
@@ -789,10 +802,12 @@
         pointerId = null;
         origin = null;
         current = [];
-        queuePaint();
+        lastInk = null;
+        paintAll();
       };
       const onDown = event => {
         if (drawing || event.type !== 'pointerdown' || !isPenDown(event)) return;
+        refreshRect();
         const point = pointFromEvent(event);
         if (!point) return;
         event.preventDefault();
@@ -803,6 +818,7 @@
         started = false;
         origin = point;
         current = [];
+        lastInk = null;
       };
       const onMove = event => {
         if (!drawing || event.pointerId !== pointerId) return;
@@ -812,7 +828,8 @@
         }
         event.preventDefault();
         event.stopPropagation();
-        const samples = event.getCoalescedEvents?.()?.length ? event.getCoalescedEvents() : [event];
+        const rawSamples = event.getCoalescedEvents?.() ?? [];
+        const samples = rawSamples.length ? rawSamples : [event];
         for (const sample of samples) {
           const point = pointFromEvent(sample);
           if (!point) continue;
@@ -829,11 +846,13 @@
             if (gap < START_MOVE) continue;
             started = true;
             current = [origin, point];
+            lastInk = origin;
+            inkSegment(origin, point);
+            lastInk = point;
             continue;
           }
           pushPoint(point);
         }
-        if (started) queuePaint();
       };
       const clear = () => {
         strokes = [];
@@ -842,7 +861,8 @@
         started = false;
         pointerId = null;
         origin = null;
-        queuePaint();
+        lastInk = null;
+        paintAll();
       };
       const swfPoint = event => {
         const rect = stage.parentElement.getBoundingClientRect();
@@ -865,7 +885,15 @@
         if (COLORS[hit.id]) color = COLORS[hit.id];
       };
       writePad.addEventListener('pointerdown', onDown);
-      writePad.addEventListener('pointermove', onMove);
+      writePad.addEventListener('pointermove', event => {
+        if (hasRaw && drawing && event.pointerId === pointerId) {
+          event.preventDefault();
+          event.stopPropagation();
+          return;
+        }
+        onMove(event);
+      });
+      if (hasRaw) writePad.addEventListener('pointerrawupdate', onMove);
       writePad.addEventListener('pointerup', endStroke);
       writePad.addEventListener('pointercancel', endStroke);
       writePad.addEventListener('lostpointercapture', endStroke);
