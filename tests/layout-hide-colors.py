@@ -44,8 +44,8 @@ def patch(path: pathlib.Path) -> str:
         write_translate_x(raw, buttons[name.decode()], hide)
 
     xc, yc, nc = read_translate(raw, buttons["clearBtn"])
-    # Center of the writing-board toolbar (panel sits at ~545.5).
-    center = int(round(545.5 * 20))
+    # Visual center of the writing-board bottom bar (outer frame ~403–689).
+    center = int(round(546 * 20))
     limit = 1 << (nc - 1)
     if not -limit <= center <= limit - 1:
         return f"clear x {center} does not fit in {nc} bits"
