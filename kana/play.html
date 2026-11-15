@@ -625,11 +625,15 @@
     const practice = setupPractice(() => wordMode ? selectedWord : ROWS.find(row => row.file === currentFile) || ROWS[0], { singleWord: wordMode });
     const selection = document.getElementById('wordSelection');
     // Writing-board input (Chromebook touch / stylus):
-    // Keep the real pointerdown/up so Ruffle moveTo()s at the tap. Only block
-    // idle hover over the pad (that was drawing before contact), and densify
-    // in-stroke moves with coalesced/raw samples so writing feels smoother.
+    // Trusted down/up reach Ruffle (moveTo on tap). Hover over the pad is blocked.
+    // In-stroke moves are smoothed + densified; large gaps are re-anchored, never
+    // inked as ruler lines (linear fill of dropped samples was the slash artifact).
     if (!wordMode) {
       const hasRaw = 'onpointerrawupdate' in window;
+      const JUMP = 42;
+      const FIRST_JUMP = 22;
+      const STEP = 1.1;
+      const SMOOTH = 0.55;
       let emitting = false;
       let stroke = null;
       const boardHas = event => {
@@ -644,14 +648,16 @@
         const path = event.composedPath?.() || [];
         return path.find(node => node && node.tagName === 'CANVAS') || path[0] || event.target;
       };
-      const emitMove = (target, source, x, y, buttons) => {
+      const emit = (type, target, source, x, y, buttons) => {
         if (!target) return;
         emitting = true;
         try {
-          target.dispatchEvent(new PointerEvent('pointermove', {
+          target.dispatchEvent(new PointerEvent(type, {
             bubbles: true, cancelable: true, composed: true, view: window,
             pointerId: source.pointerId, pointerType: source.pointerType || 'touch',
-            isPrimary: true, button: buttons ? 0 : -1, buttons,
+            isPrimary: true,
+            button: buttons ? 0 : (type === 'pointermove' ? -1 : 0),
+            buttons,
             clientX: x, clientY: y,
             pressure: buttons ? Math.max(Number(source.pressure) || 0, 0.5) : 0,
           }));
@@ -659,56 +665,78 @@
           emitting = false;
         }
       };
+      const reanchor = (source, x, y) => {
+        emit('pointerup', stroke.target, source, stroke.x, stroke.y, 0);
+        emit('pointermove', stroke.target, source, x, y, 0);
+        emit('pointerdown', stroke.target, source, x, y, 1);
+        stroke.px = x;
+        stroke.py = y;
+        stroke.x = x;
+        stroke.y = y;
+        stroke.sx = x;
+        stroke.sy = y;
+        stroke.fresh = false;
+      };
       const trace = (source, x, y) => {
-        const distance = Math.hypot(x - stroke.x, y - stroke.y);
-        if (distance < 0.75) return;
-        // Skip teleport segments (missed samples) instead of inking a straight slash.
-        if (distance > 160) {
-          emitting = true;
-          try {
-            const common = {
-              bubbles: true, cancelable: true, composed: true, view: window,
-              pointerId: source.pointerId, pointerType: source.pointerType || 'touch', isPrimary: true,
-            };
-            stroke.target.dispatchEvent(new PointerEvent('pointerup', {
-              ...common, button: 0, buttons: 0, clientX: stroke.x, clientY: stroke.y, pressure: 0,
-            }));
-            stroke.target.dispatchEvent(new PointerEvent('pointermove', {
-              ...common, button: -1, buttons: 0, clientX: x, clientY: y, pressure: 0,
-            }));
-            stroke.target.dispatchEvent(new PointerEvent('pointerdown', {
-              ...common, button: 0, buttons: 1, clientX: x, clientY: y, pressure: 0.5,
-            }));
-          } finally {
-            emitting = false;
-          }
-          stroke.x = x;
-          stroke.y = y;
+        const limit = stroke.fresh ? FIRST_JUMP : JUMP;
+        // Detect teleports on the raw sample — smoothing would hide them into straight ink.
+        if (Math.hypot(x - stroke.x, y - stroke.y) > limit) {
+          reanchor(source, x, y);
           return;
         }
-        const steps = Math.max(1, Math.ceil(distance / 1.75));
+        // Soft-follow the sample so Chromebook sparse input feels less stiff.
+        stroke.sx += (x - stroke.sx) * SMOOTH;
+        stroke.sy += (y - stroke.sy) * SMOOTH;
+        const tx = stroke.sx;
+        const ty = stroke.sy;
+        const distance = Math.hypot(tx - stroke.x, ty - stroke.y);
+        if (distance < 0.45) return;
+        stroke.fresh = false;
+        // Catmull-style: curve from last point toward target using prior point as pull.
+        const cx = stroke.x * 2 - stroke.px;
+        const cy = stroke.y * 2 - stroke.py;
+        const steps = Math.max(1, Math.ceil(distance / STEP));
         for (let step = 1; step <= steps; step += 1) {
-          const ratio = step / steps;
-          emitMove(
+          const t = step / steps;
+          const u = 1 - t;
+          emit(
+            'pointermove',
             stroke.target,
             source,
-            stroke.x + (x - stroke.x) * ratio,
-            stroke.y + (y - stroke.y) * ratio,
+            u * u * stroke.x + 2 * u * t * (stroke.x * 0.65 + cx * 0.35) + t * t * tx,
+            u * u * stroke.y + 2 * u * t * (stroke.y * 0.65 + cy * 0.35) + t * t * ty,
             1
           );
         }
-        stroke.x = x;
-        stroke.y = y;
+        stroke.px = stroke.x;
+        stroke.py = stroke.y;
+        stroke.x = tx;
+        stroke.y = ty;
       };
       stage.addEventListener('pointerdown', event => {
         if (emitting || event.button !== 0 || !boardHas(event)) return;
-        // Do not halt: the trusted down must reach Ruffle so moveTo lands on the tap.
-        stroke = { id: event.pointerId, x: event.clientX, y: event.clientY, target: surface(event) };
+        const target = surface(event);
+        try { target.setPointerCapture?.(event.pointerId); } catch (_) {}
+        stroke = {
+          id: event.pointerId,
+          x: event.clientX,
+          y: event.clientY,
+          px: event.clientX,
+          py: event.clientY,
+          sx: event.clientX,
+          sy: event.clientY,
+          target,
+          fresh: true,
+        };
       }, true);
       const follow = event => {
         if (emitting) return;
-        if (!stroke || event.pointerId !== stroke.id || event.buttons === 0) {
+        if (!stroke || event.pointerId !== stroke.id) {
           if (boardHas(event) && event.buttons === 0) halt(event);
+          return;
+        }
+        if (event.buttons === 0) {
+          if (boardHas(event)) halt(event);
           return;
         }
         halt(event);
@@ -728,6 +756,7 @@
       if (hasRaw) stage.addEventListener('pointerrawupdate', follow, true);
       const endStroke = event => {
         if (!stroke || event.pointerId !== stroke.id) return;
+        try { stroke.target.releasePointerCapture?.(event.pointerId); } catch (_) {}
         stroke = null;
       };
       window.addEventListener('pointerup', endStroke, true);
