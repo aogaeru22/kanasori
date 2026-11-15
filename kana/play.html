@@ -149,22 +149,6 @@
       touch-action: none;
     }
     .stage ruffle-player, .stage ruffle-object { width: 100%; height: 100%; display: block; touch-action: none; }
-    .write-pad {
-      position: absolute;
-      z-index: 4;
-      /* Inset inside the Flash board frame so the gray bezel stays visible. */
-      left: calc(405 / 800 * 100%);
-      top: calc((255 - 71) / 409 * 100%);
-      width: calc(280 / 800 * 100%);
-      height: calc((422 - 255) / 409 * 100%);
-      touch-action: none;
-      cursor: crosshair;
-      background: #fff;
-      border: 0;
-      padding: 0;
-      display: none;
-    }
-    body.writing .write-pad { display: block; }
     .lesson-title {
       position: absolute;
       z-index: 6;
@@ -434,7 +418,6 @@
     <div class="pages" id="pages"></div>
     <div class="stage-wrap">
       <div class="stage" id="stage"></div>
-      <canvas class="write-pad" id="writePad" aria-label="글자 쓰기판"></canvas>
       <div class="lesson-title" aria-label="학습 제목"><span id="lessonRowTitle"></span><span class="lesson-title-suffix">발음</span></div>
       <a class="pronunciation-link" id="pronunciationLink" href="#"><img src="pronunciation-button.png?v=1" alt="발음 연습"></a>
       <div class="status" id="status">자료를 불러오는 중입니다.</div>
@@ -641,274 +624,6 @@
     let selectedWord = null;
     const practice = setupPractice(() => wordMode ? selectedWord : ROWS.find(row => row.file === currentFile) || ROWS[0], { singleWord: wordMode });
     const selection = document.getElementById('wordSelection');
-    // Native writing pad (same approach as Nihongo Escape Mission 달고나):
-    // draw on our canvas with coalesced samples + quadratic smoothing. Do not route
-    // strokes through Ruffle — that caused inter-stroke connectors on Chromebooks.
-    const writePad = document.getElementById('writePad');
-    const writePadApi = (() => {
-      const MIN_STEP = 0.0025;
-      const START_MOVE = 0.003;
-      const TELEPORT = 0.16;
-      const COLORS = {
-        orangeBtn: '#e87a2f',
-        blueBtn: '#2f6fe8',
-        redBtn: '#3aa35a',
-        yellowBtn: '#e6c21a',
-        blackBtn: '#1a1a1a',
-      };
-      const TOOLS = [
-        { id: 'orangeBtn', x: 423.4, y: 446.9, r: 14 },
-        { id: 'blueBtn', x: 450.4, y: 446.9, r: 14 },
-        { id: 'redBtn', x: 477.6, y: 446.9, r: 14 },
-        { id: 'yellowBtn', x: 504.4, y: 446.9, r: 14 },
-        { id: 'blackBtn', x: 531.3, y: 446.9, r: 14 },
-        { id: 'clearBtn', x: 619.0, y: 443.1, r: 36 },
-      ];
-      const hasRaw = 'onpointerrawupdate' in window;
-      // Opaque white pad: transparent canvases composite as black over Ruffle on Chromebook.
-      const ctx = writePad.getContext('2d', { alpha: false }) || writePad.getContext('2d');
-      let strokes = [];
-      let current = [];
-      let drawing = false;
-      let started = false;
-      let pointerId = null;
-      let origin = null;
-      let color = COLORS.blackBtn;
-      let padRect = null;
-      let lastInk = null;
-      const clamp01 = value => Math.max(0, Math.min(1, value));
-      const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
-      const lineWidth = () => Math.max(5.5, writePad.width * 0.016);
-      const refreshRect = () => { padRect = writePad.getBoundingClientRect(); };
-      const pointFromEvent = event => {
-        const rect = padRect || writePad.getBoundingClientRect();
-        if (!rect.width || !rect.height) return null;
-        return {
-          x: clamp01((event.clientX - rect.left) / rect.width),
-          y: clamp01((event.clientY - rect.top) / rect.height),
-        };
-      };
-      const strokePath = (context, points, width, height) => {
-        if (!points.length) return;
-        context.beginPath();
-        context.moveTo(points[0].x * width, points[0].y * height);
-        if (points.length === 1) {
-          context.lineTo(points[0].x * width + 0.01, points[0].y * height);
-          return;
-        }
-        if (points.length === 2) {
-          context.lineTo(points[1].x * width, points[1].y * height);
-          return;
-        }
-        for (let i = 1; i < points.length - 1; i += 1) {
-          const a = points[i];
-          const b = points[i + 1];
-          context.quadraticCurveTo(a.x * width, a.y * height, ((a.x + b.x) / 2) * width, ((a.y + b.y) / 2) * height);
-        }
-        const last = points[points.length - 1];
-        context.lineTo(last.x * width, last.y * height);
-      };
-      const stylePen = (strokeColor) => {
-        if (!ctx) return;
-        ctx.lineCap = 'round';
-        ctx.lineJoin = 'round';
-        ctx.strokeStyle = strokeColor;
-        ctx.lineWidth = lineWidth();
-      };
-      const paintAll = () => {
-        if (!ctx) return;
-        const width = writePad.width;
-        const height = writePad.height;
-        ctx.fillStyle = '#fff';
-        ctx.fillRect(0, 0, width, height);
-        for (const stroke of strokes) {
-          if (!stroke.points.length) continue;
-          stylePen(stroke.color);
-          strokePath(ctx, stroke.points, width, height);
-          ctx.stroke();
-        }
-        if (current.length) {
-          stylePen(color);
-          strokePath(ctx, current, width, height);
-          ctx.stroke();
-        }
-      };
-      const inkSegment = (from, to) => {
-        if (!ctx || !from || !to) return;
-        const width = writePad.width;
-        const height = writePad.height;
-        stylePen(color);
-        ctx.beginPath();
-        ctx.moveTo(from.x * width, from.y * height);
-        ctx.lineTo(to.x * width, to.y * height);
-        ctx.stroke();
-      };
-      const resize = () => {
-        refreshRect();
-        const dpr = Math.min(window.devicePixelRatio || 1, 2);
-        const nextW = Math.max(1, Math.round((padRect?.width || 1) * dpr));
-        const nextH = Math.max(1, Math.round((padRect?.height || 1) * dpr));
-        if (writePad.width !== nextW || writePad.height !== nextH) {
-          writePad.width = nextW;
-          writePad.height = nextH;
-        }
-        paintAll();
-      };
-      const pushPoint = point => {
-        const last = current[current.length - 1];
-        if (!last) {
-          current.push(point);
-          lastInk = point;
-          return true;
-        }
-        const gap = dist(last, point);
-        if (gap < MIN_STEP) return false;
-        if (gap > TELEPORT) {
-          current.push(point);
-          lastInk = point;
-          return false;
-        }
-        if (gap > MIN_STEP * 3) {
-          const steps = Math.min(6, Math.floor(gap / MIN_STEP));
-          for (let step = 1; step < steps; step += 1) {
-            const t = step / steps;
-            const mid = { x: last.x + (point.x - last.x) * t, y: last.y + (point.y - last.y) * t };
-            current.push(mid);
-            inkSegment(lastInk, mid);
-            lastInk = mid;
-          }
-        }
-        current.push(point);
-        inkSegment(lastInk, point);
-        lastInk = point;
-        return true;
-      };
-      const isPenDown = event => {
-        if (!event.isPrimary) return false;
-        if (event.type === 'pointerdown') return true;
-        if ((event.buttons & 1) === 1) return true;
-        return typeof event.pressure === 'number' && event.pressure > 0;
-      };
-      const endStroke = event => {
-        if (!drawing || (event && pointerId !== null && event.pointerId !== pointerId)) return;
-        try {
-          if (pointerId !== null && writePad.hasPointerCapture?.(pointerId)) {
-            writePad.releasePointerCapture(pointerId);
-          }
-        } catch (_) {}
-        if (started && current.length >= 2) {
-          strokes.push({ color, points: current.slice() });
-        }
-        drawing = false;
-        started = false;
-        pointerId = null;
-        origin = null;
-        current = [];
-        lastInk = null;
-        paintAll();
-      };
-      const onDown = event => {
-        if (drawing || event.type !== 'pointerdown' || !isPenDown(event)) return;
-        refreshRect();
-        const point = pointFromEvent(event);
-        if (!point) return;
-        event.preventDefault();
-        event.stopPropagation();
-        try { writePad.setPointerCapture(event.pointerId); } catch (_) {}
-        pointerId = event.pointerId;
-        drawing = true;
-        started = false;
-        origin = point;
-        current = [];
-        lastInk = null;
-      };
-      const onMove = event => {
-        if (!drawing || event.pointerId !== pointerId) return;
-        if (event.pointerType === 'mouse' && (event.buttons & 1) !== 1) {
-          endStroke(event);
-          return;
-        }
-        event.preventDefault();
-        event.stopPropagation();
-        const rawSamples = event.getCoalescedEvents?.() ?? [];
-        const samples = rawSamples.length ? rawSamples : [event];
-        for (const sample of samples) {
-          const point = pointFromEvent(sample);
-          if (!point) continue;
-          if (!started) {
-            if (!origin) {
-              origin = point;
-              continue;
-            }
-            const gap = dist(origin, point);
-            if (gap > TELEPORT) {
-              origin = point;
-              continue;
-            }
-            if (gap < START_MOVE) continue;
-            started = true;
-            current = [origin, point];
-            lastInk = origin;
-            inkSegment(origin, point);
-            lastInk = point;
-            continue;
-          }
-          pushPoint(point);
-        }
-      };
-      const clear = () => {
-        strokes = [];
-        current = [];
-        drawing = false;
-        started = false;
-        pointerId = null;
-        origin = null;
-        lastInk = null;
-        paintAll();
-      };
-      const swfPoint = event => {
-        const rect = stage.parentElement.getBoundingClientRect();
-        if (!rect.width || !rect.height) return null;
-        return {
-          x: (event.clientX - rect.left) / rect.width * 800,
-          y: (event.clientY - rect.top) / rect.height * 409 + 71,
-        };
-      };
-      const onToolDown = event => {
-        if (wordMode || event.button !== 0) return;
-        const point = swfPoint(event);
-        if (!point) return;
-        const hit = TOOLS.find(tool => Math.hypot(point.x - tool.x, point.y - tool.y) <= tool.r);
-        if (!hit) return;
-        if (hit.id === 'clearBtn') {
-          clear();
-          return;
-        }
-        if (COLORS[hit.id]) color = COLORS[hit.id];
-      };
-      writePad.addEventListener('pointerdown', onDown);
-      writePad.addEventListener('pointermove', event => {
-        if (hasRaw && drawing && event.pointerId === pointerId) {
-          event.preventDefault();
-          event.stopPropagation();
-          return;
-        }
-        onMove(event);
-      });
-      if (hasRaw) writePad.addEventListener('pointerrawupdate', onMove);
-      writePad.addEventListener('pointerup', endStroke);
-      writePad.addEventListener('pointercancel', endStroke);
-      writePad.addEventListener('lostpointercapture', endStroke);
-      stage.parentElement.addEventListener('pointerdown', onToolDown, true);
-      window.addEventListener('resize', resize);
-      resize();
-      return { clear, resize, setActive: active => {
-        writePad.style.display = active ? 'block' : 'none';
-        if (!active) clear();
-        else resize();
-      } };
-    })();
-    writePadApi.setActive(!wordMode);
     stage.addEventListener('pointerdown', event => {
       if (!wordMode) return;
       const bounds = stage.parentElement.getBoundingClientRect();
@@ -943,7 +658,6 @@
       practice.clear();
       selectedWord = null;
       selection.hidden = true;
-      if (!wordMode) writePadApi.clear();
       if (wordMode) document.getElementById('micHint').textContent = '먼저 단어를 눌러 발음을 듣고, 녹음 버튼을 눌러 주세요.';
       const selectedRow = ROWS.find(item => item.file === file);
       renderWarningIcons(document.getElementById("warningOverlays"), selectedRow?.id, wordMode);
@@ -974,7 +688,6 @@
       const open = () => player.load(source + "?v=20-kata").then(() => {
         const pad = player.shadowRoot?.querySelector("canvas");
         if (pad) pad.style.touchAction = "none";
-        if (!wordMode) writePadApi.resize();
         const row = ROWS.find((item) => item.file === file);
         setStatus(row ? row.kana + "행" : pageLabel(file));
       }).catch((error) => {
