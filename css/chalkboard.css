@@ -146,6 +146,10 @@ tbody tr:hover { background:#f5f5dc07; }
 .learning-nav { padding-inline:18px; justify-content:space-between; }
 .learning-nav .nav-brand { color:var(--yellow); }
 .learning-nav #learner { color:var(--chalk); }
+.zoom-controls { background:#f5f5dc12; border-color:#f5f5dc70; }
+.zoom-controls button { color:var(--chalk); background:transparent; }
+.zoom-controls button:hover { background:#f5f5dc18; border-color:var(--yellow); }
+#zoomLabel { color:var(--chalk); }
 .row-tab { background:#f5f5dc09; color:var(--chalk); border-color:#f5f5dc70; border-radius:7px 11px 6px 8px; }
 .script-tabs button {
   color:var(--chalk);

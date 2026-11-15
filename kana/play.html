@@ -45,7 +45,49 @@
     .learning-nav a { color: var(--indigo); text-decoration: none; }
     .nav-left { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; min-width: 0; }
     .nav-brand { font-weight: 800; white-space: nowrap; }
-    #learner { font-weight: 700; white-space: nowrap; margin-left: auto; }
+    .nav-right {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 6px;
+      margin-left: auto;
+      flex: none;
+    }
+    #learner { font-weight: 700; white-space: nowrap; }
+    .zoom-controls {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px;
+      border: 1px solid #e7dccb;
+      border-radius: 999px;
+      background: #fffdf9;
+    }
+    .zoom-controls button {
+      width: 28px;
+      height: 28px;
+      padding: 0;
+      border: 0;
+      border-radius: 50%;
+      background: transparent;
+      color: #243e66;
+      font-size: 18px;
+      font-weight: 700;
+      line-height: 1;
+      cursor: pointer;
+    }
+    .zoom-controls button:hover { background: #f3ebe0; }
+    .zoom-controls button:disabled { opacity: .35; cursor: default; }
+    .zoom-controls button:focus-visible { outline: 3px solid #c4552a; outline-offset: 2px; }
+    #zoomLabel {
+      min-width: 3.2em;
+      text-align: center;
+      font-size: 12px;
+      font-weight: 700;
+      color: #243e66;
+      font-variant-numeric: tabular-nums;
+    }
+    .lesson-fit { zoom: var(--lesson-zoom, 1); }
     #saveRetry { margin:8px; }
     .mic-hint { max-width:90vw; }
     header, .bar, .pages, .status { display: none; }
@@ -445,7 +487,14 @@
         <button type="button" data-script="katakana">가타카나</button>
       </div>
     </div>
-    <span id="learner"></span>
+    <div class="nav-right">
+      <span id="learner"></span>
+      <div class="zoom-controls" role="group" aria-label="화면 크기">
+        <button type="button" id="zoomOut" aria-label="화면 축소">−</button>
+        <span id="zoomLabel">100%</span>
+        <button type="button" id="zoomIn" aria-label="화면 확대">+</button>
+      </div>
+    </div>
   </nav><main>
     <div class="lesson-fit">
     <nav class="kana-tabs" id="kanaTabs" aria-label="가나 행"></nav>
@@ -937,6 +986,31 @@
       const button = event.target.closest('button[data-script]');
       if (button) setScript(button.dataset.script);
     });
+
+    const ZOOM_STEPS = [0.7, 0.8, 0.9, 1, 1.1];
+    const ZOOM_KEY = 'kanasori-lesson-zoom';
+    const zoomOutBtn = document.getElementById('zoomOut');
+    const zoomInBtn = document.getElementById('zoomIn');
+    const zoomLabel = document.getElementById('zoomLabel');
+    const nearestZoom = value => ZOOM_STEPS.reduce((best, step) => Math.abs(step - value) < Math.abs(best - value) ? step : best, 1);
+    let lessonZoom = nearestZoom(Number(localStorage.getItem(ZOOM_KEY)) || 1);
+    const applyZoom = () => {
+      document.documentElement.style.setProperty('--lesson-zoom', String(lessonZoom));
+      zoomLabel.textContent = `${Math.round(lessonZoom * 100)}%`;
+      zoomOutBtn.disabled = lessonZoom <= ZOOM_STEPS[0];
+      zoomInBtn.disabled = lessonZoom >= ZOOM_STEPS[ZOOM_STEPS.length - 1];
+      localStorage.setItem(ZOOM_KEY, String(lessonZoom));
+      if (!wordMode) requestAnimationFrame(() => writePadApi.resize());
+    };
+    zoomOutBtn.addEventListener('click', () => {
+      const index = ZOOM_STEPS.indexOf(lessonZoom);
+      if (index > 0) { lessonZoom = ZOOM_STEPS[index - 1]; applyZoom(); }
+    });
+    zoomInBtn.addEventListener('click', () => {
+      const index = ZOOM_STEPS.indexOf(lessonZoom);
+      if (index < ZOOM_STEPS.length - 1) { lessonZoom = ZOOM_STEPS[index + 1]; applyZoom(); }
+    });
+    applyZoom();
 
     async function start() {
       if (!script) {
