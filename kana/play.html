@@ -149,18 +149,18 @@
       touch-action: none;
     }
     .stage ruffle-player, .stage ruffle-object { width: 100%; height: 100%; display: block; touch-action: none; }
-    /* Transparent ink layer over Flash pad — only strokes are drawn so the
-       gray frame stays seamless (no white/gray overlay seams on the right). */
+    /* Opaque white ink only inside the Flash pad. Keep the right edge clear of
+       the gray bezel — no fake gray cover (that caused the visible seam). */
     .write-pad {
       position: absolute;
       z-index: 4;
-      left: calc(430 / 800 * 100%);
-      top: calc((275 - 71) / 409 * 100%);
-      width: calc((660 - 430) / 800 * 100%);
-      height: calc((415 - 275) / 409 * 100%);
+      left: calc(434 / 800 * 100%);
+      top: calc((278 - 71) / 409 * 100%);
+      width: calc((644 - 434) / 800 * 100%);
+      height: calc((412 - 278) / 409 * 100%);
       touch-action: none;
       cursor: crosshair;
-      background: transparent;
+      background: #fff;
       border: 0;
       padding: 0;
       display: none;
@@ -649,7 +649,7 @@
     const writePadApi = (() => {
       const MIN_STEP = 0.0015;
       const TELEPORT = 0.2;
-      const ctx = writePad.getContext('2d', { alpha: true }) || writePad.getContext('2d');
+      const ctx = writePad.getContext('2d', { alpha: false }) || writePad.getContext('2d');
       let strokes = [];
       let current = [];
       let drawing = false;
@@ -695,8 +695,8 @@
         penReady = false;
         const width = writePad.width;
         const height = writePad.height;
-        // Clear to transparent so Flash board + gray frame show through.
-        ctx.clearRect(0, 0, width, height);
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(0, 0, width, height);
         applyPen();
         for (const stroke of strokes) {
           if (!stroke.length) continue;
