@@ -123,8 +123,9 @@
       top: calc(71 / 409 * -100%);
       height: calc(520 / 409 * 100%);
       background: #fff;
+      touch-action: none;
     }
-    .stage ruffle-player, .stage ruffle-object { width: 100%; height: 100%; display: block; }
+    .stage ruffle-player, .stage ruffle-object { width: 100%; height: 100%; display: block; touch-action: none; }
     .lesson-title {
       position: absolute;
       z-index: 2;
@@ -539,7 +540,88 @@
     let selectedWord = null;
     const practice = setupPractice(() => wordMode ? selectedWord : ROWS.find(row => row.file === currentFile) || ROWS[0], { singleWord: wordMode });
     const selection = document.getElementById('wordSelection');
-    // Observe the SWF's native pointer event so its original pronunciation still plays.
+    // The lesson movie draws with lineTo on every mouse move after mouseDown.
+    // Chromebook touchpads report a held button while the cursor is only
+    // moving, and a lifted finger sometimes never delivers mouseUp, so the
+    // pen keeps stroking straight lines before the next touch. A stroke
+    // starts only after a new press on the writing board, and the points
+    // in between are filled in so the line follows a finger smoothly.
+    if (!wordMode) {
+      const hasRaw = 'onpointerrawupdate' in window;
+      let arrivedHolding = false;
+      let emitting = false;
+      let stroke = null;
+      const boardHas = event => {
+        const rect = stage.getBoundingClientRect();
+        if (!rect.width || !rect.height) return false;
+        const x = (event.clientX - rect.left) / rect.width * 800;
+        const y = (event.clientY - rect.top) / rect.height * 520;
+        return x >= 390 && x <= 700 && y >= 240 && y <= 475;
+      };
+      const halt = event => { event.stopPropagation(); event.preventDefault(); };
+      const surface = event => event.composedPath()[0] || event.target;
+      const emit = (target, type, source, x, y, buttons) => {
+        emitting = true;
+        target.dispatchEvent(new PointerEvent(type, {
+          bubbles: true, cancelable: true, composed: true, view: window,
+          pointerId: source.pointerId, pointerType: source.pointerType, isPrimary: true,
+          button: 0, buttons, clientX: x, clientY: y, pressure: buttons ? 0.5 : 0,
+        }));
+        emitting = false;
+      };
+      // A long jump is a cursor entering the board, not a pen stroke. Lift
+      // and press again so the movie moves the pen instead of drawing a line.
+      const trace = (target, source, x, y) => {
+        const distance = Math.hypot(x - stroke.x, y - stroke.y);
+        if (distance > 72) {
+          emit(target, 'pointerup', source, stroke.x, stroke.y, 0);
+          emit(target, 'pointerdown', source, x, y, 1);
+          stroke.x = x; stroke.y = y;
+          return;
+        }
+        const steps = Math.max(1, Math.ceil(distance / 3));
+        for (let step = 1; step <= steps; step += 1) {
+          const ratio = step / steps;
+          emit(target, 'pointermove', source, stroke.x + (x - stroke.x) * ratio, stroke.y + (y - stroke.y) * ratio, 1);
+        }
+        stroke.x = x; stroke.y = y;
+      };
+      stage.addEventListener('pointerenter', event => { arrivedHolding = event.buttons !== 0; }, true);
+      stage.addEventListener('pointerdown', event => {
+        if (emitting || event.button !== 0 || !boardHas(event)) return;
+        if (arrivedHolding) { halt(event); return; }
+        stroke = { id: event.pointerId, x: event.clientX, y: event.clientY };
+        arrivedHolding = false;
+      }, true);
+      const follow = event => {
+        if (emitting) return;
+        const drawing = stroke && event.pointerId === stroke.id && event.buttons !== 0;
+        if (!drawing) { if (boardHas(event)) halt(event); return; }
+        halt(event);
+        const target = surface(event);
+        const points = event.getCoalescedEvents?.() || [event];
+        for (const point of points) trace(target, event, point.clientX, point.clientY);
+      };
+      stage.addEventListener('pointermove', event => {
+        if (emitting) return;
+        if (stroke && hasRaw && event.pointerId === stroke.id) { halt(event); return; }
+        follow(event);
+      }, true);
+      if (hasRaw) stage.addEventListener('pointerrawupdate', follow, true);
+      const releasePen = event => {
+        if (emitting) return;
+        if (stroke && event.pointerId === stroke.id) stroke = null;
+        arrivedHolding = false;
+      };
+      window.addEventListener('pointerup', releasePen, true);
+      window.addEventListener('pointercancel', event => {
+        if (stroke && event.pointerId === stroke.id) {
+          emit(surface(event), 'pointerup', event, event.clientX, event.clientY, 0);
+          stroke = null;
+        }
+        arrivedHolding = false;
+      }, true);
+    }
     stage.addEventListener('pointerdown', event => {
       if (!wordMode) return;
       const bounds = stage.parentElement.getBoundingClientRect();
@@ -598,9 +680,12 @@
       const player = ruffle.createPlayer();
       player.style.width = "100%";
       player.style.height = "100%";
+      player.style.touchAction = "none";
       stage.append(player);
       const source = wordMode ? `voca_practice_hiragana/${selectedRow.id}행${selectedRow.id === 'wa' ? '_n' : ''}.swf` : file;
       const open = () => player.load(source + "?v=19-ma").then(() => {
+        const pad = player.shadowRoot?.querySelector("canvas");
+        if (pad) pad.style.touchAction = "none";
         const row = ROWS.find((item) => item.file === file);
         setStatus(row ? row.kana + "행" : pageLabel(file));
       }).catch((error) => {
