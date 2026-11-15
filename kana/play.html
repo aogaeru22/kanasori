@@ -625,15 +625,14 @@
     const practice = setupPractice(() => wordMode ? selectedWord : ROWS.find(row => row.file === currentFile) || ROWS[0], { singleWord: wordMode });
     const selection = document.getElementById('wordSelection');
     // Writing-board input (Chromebook touch / stylus):
-    // Trusted down/up reach Ruffle (moveTo on tap). Hover over the pad is blocked.
-    // In-stroke moves are smoothed + densified; large gaps are re-anchored, never
-    // inked as ruler lines (linear fill of dropped samples was the slash artifact).
+    // Trusted down/up reach Ruffle. Hover on the pad is blocked. Moves are densified
+    // for smoothness. Do NOT re-anchor mid-stroke (that was cutting each stroke short
+    // and spawning end-slash lines). Only skip absurd teleports; finish the tip on up.
     if (!wordMode) {
       const hasRaw = 'onpointerrawupdate' in window;
-      const JUMP = 42;
-      const FIRST_JUMP = 22;
-      const STEP = 1.1;
-      const SMOOTH = 0.55;
+      const TELEPORT = 180;
+      const STEP = 1.2;
+      const SMOOTH = 0.78;
       let emitting = false;
       let stroke = null;
       const boardHas = event => {
@@ -648,70 +647,76 @@
         const path = event.composedPath?.() || [];
         return path.find(node => node && node.tagName === 'CANVAS') || path[0] || event.target;
       };
-      const emit = (type, target, source, x, y, buttons) => {
-        if (!target) return;
+      const emitMove = (source, x, y) => {
+        if (!stroke?.target) return;
         emitting = true;
         try {
-          target.dispatchEvent(new PointerEvent(type, {
+          stroke.target.dispatchEvent(new PointerEvent('pointermove', {
             bubbles: true, cancelable: true, composed: true, view: window,
             pointerId: source.pointerId, pointerType: source.pointerType || 'touch',
-            isPrimary: true,
-            button: buttons ? 0 : (type === 'pointermove' ? -1 : 0),
-            buttons,
+            isPrimary: true, button: 0, buttons: 1,
             clientX: x, clientY: y,
-            pressure: buttons ? Math.max(Number(source.pressure) || 0, 0.5) : 0,
+            pressure: Math.max(Number(source.pressure) || 0, 0.5),
           }));
         } finally {
           emitting = false;
         }
       };
-      const reanchor = (source, x, y) => {
-        emit('pointerup', stroke.target, source, stroke.x, stroke.y, 0);
-        emit('pointermove', stroke.target, source, x, y, 0);
-        emit('pointerdown', stroke.target, source, x, y, 1);
-        stroke.px = x;
-        stroke.py = y;
-        stroke.x = x;
-        stroke.y = y;
-        stroke.sx = x;
-        stroke.sy = y;
-        stroke.fresh = false;
-      };
-      const trace = (source, x, y) => {
-        const limit = stroke.fresh ? FIRST_JUMP : JUMP;
-        // Detect teleports on the raw sample — smoothing would hide them into straight ink.
-        if (Math.hypot(x - stroke.x, y - stroke.y) > limit) {
-          reanchor(source, x, y);
+      const inkTo = (source, x, y, { smooth = true, finalize = false } = {}) => {
+        const raw = Math.hypot(x - stroke.x, y - stroke.y);
+        // Drop lift/glitch spikes that slash off the tip of a stroke.
+        if (!finalize && stroke.samples > 2 && raw > Math.max(56, stroke.avg * 4.5) && raw <= TELEPORT) {
           return;
         }
-        // Soft-follow the sample so Chromebook sparse input feels less stiff.
-        stroke.sx += (x - stroke.sx) * SMOOTH;
-        stroke.sy += (y - stroke.sy) * SMOOTH;
-        const tx = stroke.sx;
-        const ty = stroke.sy;
+        let tx = x;
+        let ty = y;
+        if (smooth) {
+          stroke.sx += (x - stroke.sx) * SMOOTH;
+          stroke.sy += (y - stroke.sy) * SMOOTH;
+          tx = stroke.sx;
+          ty = stroke.sy;
+        } else {
+          stroke.sx = x;
+          stroke.sy = y;
+        }
         const distance = Math.hypot(tx - stroke.x, ty - stroke.y);
-        if (distance < 0.45) return;
-        stroke.fresh = false;
-        // Catmull-style: curve from last point toward target using prior point as pull.
-        const cx = stroke.x * 2 - stroke.px;
-        const cy = stroke.y * 2 - stroke.py;
+        if (distance < 0.4) return;
+        // Only absurd board-crossing jumps restart. Normal sparse samples stay one stroke.
+        if (distance > TELEPORT) {
+          emitting = true;
+          try {
+            const common = {
+              bubbles: true, cancelable: true, composed: true, view: window,
+              pointerId: source.pointerId, pointerType: source.pointerType || 'touch', isPrimary: true,
+            };
+            stroke.target.dispatchEvent(new PointerEvent('pointerup', {
+              ...common, button: 0, buttons: 0, clientX: stroke.x, clientY: stroke.y, pressure: 0,
+            }));
+            stroke.target.dispatchEvent(new PointerEvent('pointermove', {
+              ...common, button: -1, buttons: 0, clientX: tx, clientY: ty, pressure: 0,
+            }));
+            stroke.target.dispatchEvent(new PointerEvent('pointerdown', {
+              ...common, button: 0, buttons: 1, clientX: tx, clientY: ty, pressure: 0.5,
+            }));
+          } finally {
+            emitting = false;
+          }
+          stroke.x = tx;
+          stroke.y = ty;
+          stroke.sx = tx;
+          stroke.sy = ty;
+          stroke.avg = distance;
+          return;
+        }
         const steps = Math.max(1, Math.ceil(distance / STEP));
         for (let step = 1; step <= steps; step += 1) {
           const t = step / steps;
-          const u = 1 - t;
-          emit(
-            'pointermove',
-            stroke.target,
-            source,
-            u * u * stroke.x + 2 * u * t * (stroke.x * 0.65 + cx * 0.35) + t * t * tx,
-            u * u * stroke.y + 2 * u * t * (stroke.y * 0.65 + cy * 0.35) + t * t * ty,
-            1
-          );
+          emitMove(source, stroke.x + (tx - stroke.x) * t, stroke.y + (ty - stroke.y) * t);
         }
-        stroke.px = stroke.x;
-        stroke.py = stroke.y;
         stroke.x = tx;
         stroke.y = ty;
+        stroke.samples += 1;
+        stroke.avg = stroke.avg * 0.8 + distance * 0.2;
       };
       stage.addEventListener('pointerdown', event => {
         if (emitting || event.button !== 0 || !boardHas(event)) return;
@@ -721,12 +726,11 @@
           id: event.pointerId,
           x: event.clientX,
           y: event.clientY,
-          px: event.clientX,
-          py: event.clientY,
           sx: event.clientX,
           sy: event.clientY,
           target,
-          fresh: true,
+          samples: 0,
+          avg: 8,
         };
       }, true);
       const follow = event => {
@@ -742,7 +746,7 @@
         halt(event);
         const points = event.getCoalescedEvents?.() ?? [];
         const samples = points.length ? points : [event];
-        for (const point of samples) trace(event, point.clientX, point.clientY);
+        for (const point of samples) inkTo(event, point.clientX, point.clientY);
       };
       stage.addEventListener('pointermove', event => {
         if (emitting) return;
@@ -756,6 +760,11 @@
       if (hasRaw) stage.addEventListener('pointerrawupdate', follow, true);
       const endStroke = event => {
         if (!stroke || event.pointerId !== stroke.id) return;
+        const dist = Math.hypot(event.clientX - stroke.x, event.clientY - stroke.y);
+        // Finish the tip to the real lift point; ignore junk lift teleports.
+        if (dist > 0.5 && dist <= Math.max(56, stroke.avg * 4.5)) {
+          inkTo(event, event.clientX, event.clientY, { smooth: false, finalize: true });
+        }
         try { stroke.target.releasePointerCapture?.(event.pointerId); } catch (_) {}
         stroke = null;
       };
