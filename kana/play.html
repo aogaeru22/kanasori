@@ -625,10 +625,10 @@
     const practice = setupPractice(() => wordMode ? selectedWord : ROWS.find(row => row.file === currentFile) || ROWS[0], { singleWord: wordMode });
     const selection = document.getElementById('wordSelection');
     // Writing-board input (Chromebook touch / stylus):
-    // The SWF draws with lineTo after mouseDown. Hover/proximity moves and a
-    // stuck mouseDown leave long straight lines; sparse pointermove feels stiff.
-    // We own board presses: block native board events, lift any stuck pen, then
-    // replay down/move/up with interpolated samples from coalesced/raw updates.
+    // The SWF lineTo()s after mouseDown. Idle crayon sits on the left of the
+    // pad, so a down that uses a stale mouse point draws a straight line to the
+    // tap. Own board presses: park the pen (move, buttons up) at the tap first,
+    // then down/move/up. Interpolate samples so strokes feel less stiff.
     if (!wordMode) {
       const hasRaw = 'onpointerrawupdate' in window;
       let emitting = false;
@@ -642,33 +642,54 @@
       };
       const pressed = event => event.buttons !== 0;
       const halt = event => { event.stopPropagation(); event.preventDefault(); };
-      const surface = event => event.composedPath()[0] || event.target;
+      const surface = event => {
+        const path = event.composedPath?.() || [];
+        return path.find(node => node && node.tagName === 'CANVAS') || path[0] || event.target;
+      };
       const emit = (target, type, source, x, y, buttons) => {
         if (!target) return;
+        const pointerType = source.pointerType || 'touch';
+        const base = {
+          bubbles: true, cancelable: true, composed: true, view: window,
+          clientX: x, clientY: y, screenX: x, screenY: y,
+          button: buttons ? 0 : -1, buttons,
+        };
         emitting = true;
         try {
           target.dispatchEvent(new PointerEvent(type, {
-            bubbles: true, cancelable: true, composed: true, view: window,
-            pointerId: source.pointerId, pointerType: source.pointerType || 'touch', isPrimary: true,
-            button: buttons ? 0 : -1, buttons, clientX: x, clientY: y,
+            ...base,
+            pointerId: source.pointerId || 1,
+            pointerType,
+            isPrimary: true,
             pressure: buttons ? Math.max(Number(source.pressure) || 0, 0.5) : 0,
           }));
+          const mouseType = type === 'pointerdown' ? 'mousedown'
+            : type === 'pointerup' ? 'mouseup'
+            : type === 'pointermove' ? 'mousemove' : null;
+          if (mouseType) target.dispatchEvent(new MouseEvent(mouseType, base));
         } finally {
           emitting = false;
         }
       };
+      const park = (target, source, x, y) => {
+        // Move the SWF cursor with the button up so the next down moveTo()s here.
+        emit(target, 'pointermove', source, x, y, 0);
+      };
       const lift = (target, source, x, y) => {
         if (!target) return;
         emit(target, 'pointerup', source, x, y, 0);
-        emit(target, 'pointermove', source, x, y, 0);
+        park(target, source, x, y);
+      };
+      const begin = (target, source, x, y) => {
+        park(target, source, x, y);
+        emit(target, 'pointerdown', source, x, y, 1);
       };
       const trace = (source, x, y) => {
         const distance = Math.hypot(x - stroke.x, y - stroke.y);
         if (distance < 1.25) return;
-        // A jump is the cursor re-entering, not a stroke — lift and press again.
         if (distance > 56) {
           lift(stroke.target, source, stroke.x, stroke.y);
-          emit(stroke.target, 'pointerdown', source, x, y, 1);
+          begin(stroke.target, source, x, y);
           stroke.x = x;
           stroke.y = y;
           return;
@@ -694,10 +715,8 @@
         const target = surface(event);
         const x = event.clientX;
         const y = event.clientY;
-        // Clear any stuck SWF pen before starting a fresh stroke.
         if (stroke) lift(stroke.target, event, stroke.x, stroke.y);
-        else lift(target, event, x, y);
-        emit(target, 'pointerdown', event, x, y, 1);
+        begin(target, event, x, y);
         stroke = { id: event.pointerId, x, y, target };
       }, true);
       const follow = event => {
@@ -713,7 +732,6 @@
       };
       stage.addEventListener('pointermove', event => {
         if (emitting) return;
-        // Hover / proximity over the board must never reach the SWF.
         if (!stroke || event.pointerId !== stroke.id || !pressed(event)) {
           if (boardHas(event)) halt(event);
           return;
