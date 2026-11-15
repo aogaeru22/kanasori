@@ -624,14 +624,11 @@
     let selectedWord = null;
     const practice = setupPractice(() => wordMode ? selectedWord : ROWS.find(row => row.file === currentFile) || ROWS[0], { singleWord: wordMode });
     const selection = document.getElementById('wordSelection');
-    // The lesson movie draws with lineTo on every mouse move after mouseDown,
-    // and a lifted finger sometimes never delivers mouseUp. Moves over the
-    // writing board are ignored until a press starts there, so a hand
-    // approaching the screen cannot draw. A press that began outside never
-    // delivers pointerdown on the board, so those moves stay blocked too.
-    // Chrome's pointermove is sparse. pointerrawupdate has the samples in
-    // between; Ruffle only listens for pointermove and reads offsetX, so the
-    // samples are forwarded to the same canvas.
+    // Writing-board input (Chromebook touch / stylus):
+    // The SWF draws with lineTo after mouseDown. Hover/proximity moves and a
+    // stuck mouseDown leave long straight lines; sparse pointermove feels stiff.
+    // We own board presses: block native board events, lift any stuck pen, then
+    // replay down/move/up with interpolated samples from coalesced/raw updates.
     if (!wordMode) {
       const hasRaw = 'onpointerrawupdate' in window;
       let emitting = false;
@@ -643,6 +640,7 @@
         const y = (event.clientY - rect.top) / rect.height * 520;
         return x >= 390 && x <= 700 && y >= 240 && y <= 475;
       };
+      const pressed = event => event.buttons !== 0;
       const halt = event => { event.stopPropagation(); event.preventDefault(); };
       const surface = event => event.composedPath()[0] || event.target;
       const emit = (target, type, source, x, y, buttons) => {
@@ -651,50 +649,88 @@
         try {
           target.dispatchEvent(new PointerEvent(type, {
             bubbles: true, cancelable: true, composed: true, view: window,
-            pointerId: source.pointerId, pointerType: source.pointerType, isPrimary: true,
-            button: 0, buttons, clientX: x, clientY: y, pressure: buttons ? 0.5 : 0,
+            pointerId: source.pointerId, pointerType: source.pointerType || 'touch', isPrimary: true,
+            button: buttons ? 0 : -1, buttons, clientX: x, clientY: y,
+            pressure: buttons ? Math.max(Number(source.pressure) || 0, 0.5) : 0,
           }));
         } finally {
           emitting = false;
         }
       };
+      const lift = (target, source, x, y) => {
+        if (!target) return;
+        emit(target, 'pointerup', source, x, y, 0);
+        emit(target, 'pointermove', source, x, y, 0);
+      };
+      const trace = (source, x, y) => {
+        const distance = Math.hypot(x - stroke.x, y - stroke.y);
+        if (distance < 1.25) return;
+        // A jump is the cursor re-entering, not a stroke — lift and press again.
+        if (distance > 56) {
+          lift(stroke.target, source, stroke.x, stroke.y);
+          emit(stroke.target, 'pointerdown', source, x, y, 1);
+          stroke.x = x;
+          stroke.y = y;
+          return;
+        }
+        const steps = Math.max(1, Math.ceil(distance / 2.5));
+        for (let step = 1; step <= steps; step += 1) {
+          const ratio = step / steps;
+          emit(
+            stroke.target,
+            'pointermove',
+            source,
+            stroke.x + (x - stroke.x) * ratio,
+            stroke.y + (y - stroke.y) * ratio,
+            1
+          );
+        }
+        stroke.x = x;
+        stroke.y = y;
+      };
       stage.addEventListener('pointerdown', event => {
-        if (emitting || event.button !== 0 || !boardHas(event)) return;
-        stroke = { id: event.pointerId, x: event.clientX, y: event.clientY, target: surface(event) };
+        if (emitting || event.button !== 0 || !boardHas(event) || !pressed(event)) return;
+        halt(event);
+        const target = surface(event);
+        const x = event.clientX;
+        const y = event.clientY;
+        // Clear any stuck SWF pen before starting a fresh stroke.
+        if (stroke) lift(stroke.target, event, stroke.x, stroke.y);
+        else lift(target, event, x, y);
+        emit(target, 'pointerdown', event, x, y, 1);
+        stroke = { id: event.pointerId, x, y, target };
       }, true);
       const follow = event => {
         if (emitting) return;
-        if (!stroke || event.pointerId !== stroke.id || event.buttons === 0) {
+        if (!stroke || event.pointerId !== stroke.id || !pressed(event)) {
           if (boardHas(event)) halt(event);
           return;
         }
         halt(event);
         const points = event.getCoalescedEvents?.() ?? [];
         const samples = points.length ? points : [event];
-        for (const point of samples) {
-          emit(stroke.target, 'pointermove', event, point.clientX, point.clientY, 1);
-          stroke.x = point.clientX;
-          stroke.y = point.clientY;
-        }
+        for (const point of samples) trace(event, point.clientX, point.clientY);
       };
       stage.addEventListener('pointermove', event => {
         if (emitting) return;
-        if (stroke && hasRaw && event.pointerId === stroke.id && event.buttons !== 0) { halt(event); return; }
+        // Hover / proximity over the board must never reach the SWF.
+        if (!stroke || event.pointerId !== stroke.id || !pressed(event)) {
+          if (boardHas(event)) halt(event);
+          return;
+        }
+        if (hasRaw) { halt(event); return; }
         follow(event);
       }, true);
       if (hasRaw) stage.addEventListener('pointerrawupdate', follow, true);
-      window.addEventListener('pointerup', event => {
-        if (emitting) return;
-        if (stroke && event.pointerId === stroke.id) stroke = null;
-      }, true);
-      window.addEventListener('pointercancel', event => {
+      const endStroke = event => {
         if (emitting || !stroke || event.pointerId !== stroke.id) return;
-        const target = stroke.target;
-        const x = event.clientX;
-        const y = event.clientY;
+        halt(event);
+        const { target, x, y } = stroke;
         stroke = null;
-        emit(target, 'pointerup', event, x, y, 0);
-      }, true);
+        lift(target, event, event.clientX || x, event.clientY || y);
+      };
+      window.addEventListener('pointerup', endStroke, true);
+      window.addEventListener('pointercancel', endStroke, true);
     }
     stage.addEventListener('pointerdown', event => {
       if (!wordMode) return;
