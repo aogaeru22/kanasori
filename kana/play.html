@@ -152,13 +152,14 @@
     .write-pad {
       position: absolute;
       z-index: 4;
-      left: calc(398 / 800 * 100%);
-      top: calc((248 - 71) / 409 * 100%);
-      width: calc(294 / 800 * 100%);
-      height: calc((428 - 248) / 409 * 100%);
+      /* Inset inside the Flash board frame so the gray bezel stays visible. */
+      left: calc(405 / 800 * 100%);
+      top: calc((255 - 71) / 409 * 100%);
+      width: calc(280 / 800 * 100%);
+      height: calc((422 - 255) / 409 * 100%);
       touch-action: none;
       cursor: crosshair;
-      background: transparent;
+      background: #fff;
       border: 0;
       padding: 0;
       display: none;
@@ -664,7 +665,8 @@
         { id: 'clearBtn', x: 619.0, y: 443.1, r: 36 },
       ];
       const hasRaw = 'onpointerrawupdate' in window;
-      const ctx = writePad.getContext('2d', { alpha: true, desynchronized: true }) || writePad.getContext('2d');
+      // Opaque white pad: transparent canvases composite as black over Ruffle on Chromebook.
+      const ctx = writePad.getContext('2d', { alpha: false }) || writePad.getContext('2d');
       let strokes = [];
       let current = [];
       let drawing = false;
@@ -717,8 +719,8 @@
         if (!ctx) return;
         const width = writePad.width;
         const height = writePad.height;
-        // Keep the canvas transparent so the Flash board frame stays visible underneath.
-        ctx.clearRect(0, 0, width, height);
+        ctx.fillStyle = '#fff';
+        ctx.fillRect(0, 0, width, height);
         for (const stroke of strokes) {
           if (!stroke.points.length) continue;
           stylePen(stroke.color);
