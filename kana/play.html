@@ -149,15 +149,15 @@
       touch-action: none;
     }
     .stage ruffle-player, .stage ruffle-object { width: 100%; height: 100%; display: block; touch-action: none; }
-    /* Opaque white ink only inside the Flash pad. Keep the right edge clear of
-       the gray bezel — no fake gray cover (that caused the visible seam). */
+    /* Opaque white ink over the Flash pad interior. Bottom/right reach the
+       white board edge so strokes are not clipped short of the gray frame. */
     .write-pad {
       position: absolute;
       z-index: 4;
-      left: calc(434 / 800 * 100%);
-      top: calc((278 - 71) / 409 * 100%);
-      width: calc((644 - 434) / 800 * 100%);
-      height: calc((412 - 278) / 409 * 100%);
+      left: calc(418 / 800 * 100%);
+      top: calc((268 - 71) / 409 * 100%);
+      width: calc((662 - 418) / 800 * 100%);
+      height: calc((432 - 268) / 409 * 100%);
       touch-action: none;
       cursor: crosshair;
       background: #fff;
