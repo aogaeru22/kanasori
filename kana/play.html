@@ -149,14 +149,15 @@
       touch-action: none;
     }
     .stage ruffle-player, .stage ruffle-object { width: 100%; height: 100%; display: block; touch-action: none; }
-    /* Ink only over the Flash pad interior (shape ~418–673, 263–428). */
+    /* Ink only over the Flash panel interior (~427–664, 272–418).
+       Wider bounds were covering the right gray bezel. */
     .write-pad {
       position: absolute;
       z-index: 4;
-      left: calc(418.1 / 800 * 100%);
-      top: calc((263.3 - 71) / 409 * 100%);
-      width: calc((673.1 - 418.1) / 800 * 100%);
-      height: calc((428.2 - 263.3) / 409 * 100%);
+      left: calc(428 / 800 * 100%);
+      top: calc((274 - 71) / 409 * 100%);
+      width: calc((662 - 428) / 800 * 100%);
+      height: calc((416 - 274) / 409 * 100%);
       touch-action: none;
       cursor: crosshair;
       background: #fff;
@@ -165,19 +166,6 @@
       display: none;
     }
     body.writing .write-pad { display: block; }
-    /* Narrow cover for leftover divider only — must not overlap 화면지우기 (~546±32). */
-    .write-toolbar-cover {
-      position: absolute;
-      z-index: 5;
-      left: calc(585 / 800 * 100%);
-      top: calc((436 - 71) / 409 * 100%);
-      width: calc(8 / 800 * 100%);
-      height: calc(20 / 409 * 100%);
-      background: #d7d7d7;
-      pointer-events: none;
-      display: none;
-    }
-    body.writing .write-toolbar-cover { display: block; }
     .lesson-title {
       position: absolute;
       z-index: 6;
@@ -448,7 +436,6 @@
     <div class="stage-wrap">
       <div class="stage" id="stage"></div>
       <canvas class="write-pad" id="writePad" aria-label="글자 쓰기판"></canvas>
-      <div class="write-toolbar-cover" aria-hidden="true"></div>
       <div class="lesson-title" aria-label="학습 제목"><span id="lessonRowTitle"></span><span class="lesson-title-suffix">발음</span></div>
       <a class="pronunciation-link" id="pronunciationLink" href="#"><img src="pronunciation-button.png?v=1" alt="발음 연습"></a>
       <div class="status" id="status">자료를 불러오는 중입니다.</div>
@@ -833,7 +820,6 @@
         resize,
         setActive: active => {
           writePad.style.display = active ? 'block' : 'none';
-          document.querySelector('.write-toolbar-cover').style.display = active ? 'block' : 'none';
           if (!active) clear();
           else resize();
         },
