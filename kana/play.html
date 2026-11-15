@@ -889,7 +889,7 @@
       player.style.touchAction = "none";
       stage.append(player);
       const source = wordMode ? selectedRow.voca : file;
-      const open = () => player.load(source + "?v=24-smooth").then(() => {
+      const open = () => player.load(source + "?v=25-noptr").then(() => {
         const pad = player.shadowRoot?.querySelector("canvas");
         if (pad) pad.style.touchAction = "none";
         if (!wordMode) writePadApi.resize();
