@@ -6,3 +6,5 @@ node_modules/
 *.sqlite-shm
 *.sqlite-wal
 __pycache__/
+
+kana/voca_practice_hiragana/before/
