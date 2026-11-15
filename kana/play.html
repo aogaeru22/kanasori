@@ -625,9 +625,10 @@
     const practice = setupPractice(() => wordMode ? selectedWord : ROWS.find(row => row.file === currentFile) || ROWS[0], { singleWord: wordMode });
     const selection = document.getElementById('wordSelection');
     // Writing-board input (Chromebook touch / stylus):
-    // Trusted down/up reach Ruffle. Hover on the pad is blocked. Moves are densified
-    // for smoothness. Do NOT re-anchor mid-stroke (that was cutting each stroke short
-    // and spawning end-slash lines). Only skip absurd teleports; finish the tip on up.
+    // Hover on the pad is blocked (prevents ink-before-tap). That also freezes Flash's
+    // pen at the previous stroke end — so each new tap must park (buttons=0 move) at the
+    // tap point before press, or the next stroke lineTo's from the old tip (connector).
+    // Never release pointer capture in the up capture phase (Ruffle would miss mouseUp).
     if (!wordMode) {
       const hasRaw = 'onpointerrawupdate' in window;
       const TELEPORT = 180;
@@ -647,16 +648,18 @@
         const path = event.composedPath?.() || [];
         return path.find(node => node && node.tagName === 'CANVAS') || path[0] || event.target;
       };
-      const emitMove = (source, x, y) => {
-        if (!stroke?.target) return;
+      const emit = (type, target, source, x, y, buttons) => {
+        if (!target) return;
         emitting = true;
         try {
-          stroke.target.dispatchEvent(new PointerEvent('pointermove', {
+          target.dispatchEvent(new PointerEvent(type, {
             bubbles: true, cancelable: true, composed: true, view: window,
             pointerId: source.pointerId, pointerType: source.pointerType || 'touch',
-            isPrimary: true, button: 0, buttons: 1,
+            isPrimary: true,
+            button: buttons ? 0 : (type === 'pointermove' ? -1 : 0),
+            buttons,
             clientX: x, clientY: y,
-            pressure: Math.max(Number(source.pressure) || 0, 0.5),
+            pressure: buttons ? Math.max(Number(source.pressure) || 0, 0.5) : 0,
           }));
         } finally {
           emitting = false;
@@ -664,7 +667,6 @@
       };
       const inkTo = (source, x, y, { smooth = true, finalize = false } = {}) => {
         const raw = Math.hypot(x - stroke.x, y - stroke.y);
-        // Drop lift/glitch spikes that slash off the tip of a stroke.
         if (!finalize && stroke.samples > 2 && raw > Math.max(56, stroke.avg * 4.5) && raw <= TELEPORT) {
           return;
         }
@@ -681,26 +683,11 @@
         }
         const distance = Math.hypot(tx - stroke.x, ty - stroke.y);
         if (distance < 0.4) return;
-        // Only absurd board-crossing jumps restart. Normal sparse samples stay one stroke.
         if (distance > TELEPORT) {
-          emitting = true;
-          try {
-            const common = {
-              bubbles: true, cancelable: true, composed: true, view: window,
-              pointerId: source.pointerId, pointerType: source.pointerType || 'touch', isPrimary: true,
-            };
-            stroke.target.dispatchEvent(new PointerEvent('pointerup', {
-              ...common, button: 0, buttons: 0, clientX: stroke.x, clientY: stroke.y, pressure: 0,
-            }));
-            stroke.target.dispatchEvent(new PointerEvent('pointermove', {
-              ...common, button: -1, buttons: 0, clientX: tx, clientY: ty, pressure: 0,
-            }));
-            stroke.target.dispatchEvent(new PointerEvent('pointerdown', {
-              ...common, button: 0, buttons: 1, clientX: tx, clientY: ty, pressure: 0.5,
-            }));
-          } finally {
-            emitting = false;
-          }
+          // Board-crossing glitch only: lift, park, press at the new point.
+          emit('pointerup', stroke.target, source, stroke.x, stroke.y, 0);
+          emit('pointermove', stroke.target, source, tx, ty, 0);
+          emit('pointerdown', stroke.target, source, tx, ty, 1);
           stroke.x = tx;
           stroke.y = ty;
           stroke.sx = tx;
@@ -711,7 +698,7 @@
         const steps = Math.max(1, Math.ceil(distance / STEP));
         for (let step = 1; step <= steps; step += 1) {
           const t = step / steps;
-          emitMove(source, stroke.x + (tx - stroke.x) * t, stroke.y + (ty - stroke.y) * t);
+          emit('pointermove', stroke.target, source, stroke.x + (tx - stroke.x) * t, stroke.y + (ty - stroke.y) * t, 1);
         }
         stroke.x = tx;
         stroke.y = ty;
@@ -721,6 +708,8 @@
       stage.addEventListener('pointerdown', event => {
         if (emitting || event.button !== 0 || !boardHas(event)) return;
         const target = surface(event);
+        // Park Flash pen here before press — stops connectors between strokes.
+        emit('pointermove', target, event, event.clientX, event.clientY, 0);
         try { target.setPointerCapture?.(event.pointerId); } catch (_) {}
         stroke = {
           id: event.pointerId,
@@ -759,14 +748,19 @@
       }, true);
       if (hasRaw) stage.addEventListener('pointerrawupdate', follow, true);
       const endStroke = event => {
-        if (!stroke || event.pointerId !== stroke.id) return;
+        if (emitting || !stroke || event.pointerId !== stroke.id) return;
         const dist = Math.hypot(event.clientX - stroke.x, event.clientY - stroke.y);
-        // Finish the tip to the real lift point; ignore junk lift teleports.
         if (dist > 0.5 && dist <= Math.max(56, stroke.avg * 4.5)) {
           inkTo(event, event.clientX, event.clientY, { smooth: false, finalize: true });
         }
-        try { stroke.target.releasePointerCapture?.(event.pointerId); } catch (_) {}
+        const target = stroke.target;
+        const x = stroke.x;
+        const y = stroke.y;
         stroke = null;
+        // Guarantee Flash mouseUp at the tip. Do not release capture here — that
+        // dropped the real up before Ruffle saw it and left the pen "down".
+        emit('pointerup', target, event, x, y, 0);
+        halt(event);
       };
       window.addEventListener('pointerup', endStroke, true);
       window.addEventListener('pointercancel', endStroke, true);
