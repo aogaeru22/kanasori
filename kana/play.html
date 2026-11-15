@@ -191,17 +191,19 @@
     .pronunciation-link:hover { transform: translateY(-2px); }
     .pronunciation-link:active { transform: translateY(1px); }
     .pronunciation-link:focus-visible { outline: 3px solid #c4552a; outline-offset: 3px; }
-    body.words .pronunciation-link { display: none; }
+    body.words .pronunciation-link { display: none !important; }
     body.words .kana-tabs, body.words .practice-navigation { display: none; }
     body.words .script-tabs { margin-bottom: 10px; }
     .return-link { display: none; }
     body.words .return-link {
-      display: flex; align-items: center; justify-content: center; gap: .45em;
-      position: absolute; z-index: 3; right: 1%; bottom: 4%;
-      padding: 1.3cqw 1.5cqw; border-radius: 1.5cqw;
+      display: flex; align-items: center; justify-content: center; gap: .35em;
+      position: absolute; z-index: 5; right: .8%; bottom: 2.2%; width: 9%;
+      min-height: 11%; box-sizing: border-box;
+      padding: .6cqw .4cqw; border-radius: 1.5cqw;
       color: #fff; background: linear-gradient(145deg, #365e8d, #203e66);
       border: 1px solid #426893; box-shadow: 0 .35cqw 0 #142d4d, 0 .6cqw 1cqw #243e6626;
-      font-size: 1.8cqw; font-weight: 700; text-decoration: none;
+      font-size: 1.55cqw; font-weight: 700; text-decoration: none; text-align: center;
+      line-height: 1.2;
     }
     .return-link:hover { filter: brightness(1.12); }
     .return-link:focus-visible { outline: 3px solid #c4552a; outline-offset: 3px; }

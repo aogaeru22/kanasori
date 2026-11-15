@@ -157,8 +157,13 @@ tbody tr:hover { background:#f5f5dc07; }
 .stage,.lesson-title { background:white; }
 .lesson-title,.lesson-title span { color:#2D4A2D; }
 .lesson-title .lesson-title-suffix { color:#965322; }
-.return-link { background:var(--board); color:var(--chalk); border:2px solid #f5f5dc90; }
+body.words .return-link {
+  background:linear-gradient(145deg, #365e8d, #203e66);
+  color:#fff;
+  border:1px solid #426893;
+}
 .pronunciation-link { background:transparent; border:0; box-shadow:none; padding:0; }
+body.words .pronunciation-link { display:none !important; }
 .mic { color:var(--board-dark); background:var(--yellow); border:3px solid #fff4ac; box-shadow:0 0 0 6px #ffd70015; }
 .mic.recording { background:var(--red); color:#fff; border-color:#ffd3cd; }
 .mic-hint,.save-status,.heard-box span,.verdict-sub,.speaking-title,.ring small { color:var(--muted); }
