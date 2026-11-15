@@ -298,6 +298,319 @@ export const WORD_TARGETS = {
       "y": 363.95,
       "radius": 44.0
     }
+  ],
+  "kata-a": [
+    {
+      "reading": "エア",
+      "x": 540.95,
+      "y": 194.0,
+      "radius": 44.0
+    },
+    {
+      "reading": "オーケー",
+      "x": 248.0,
+      "y": 204.95,
+      "radius": 51.0,
+      "radiusY": 47.5
+    },
+    {
+      "reading": "ケーキ",
+      "x": 268.0,
+      "y": 392.95,
+      "radius": 44.0
+    },
+    {
+      "reading": "エコー",
+      "x": 526.95,
+      "y": 394.0,
+      "radius": 44.0
+    }
+  ],
+  "kata-ha": [
+    {
+      "reading": "ハム",
+      "x": 393.95,
+      "y": 129.0,
+      "radius": 44.0
+    },
+    {
+      "reading": "モニター",
+      "x": 249.0,
+      "y": 237.0,
+      "radius": 48.4,
+      "radiusY": 44.0
+    },
+    {
+      "reading": "マスク",
+      "x": 292.0,
+      "y": 415.95,
+      "radius": 44.0
+    },
+    {
+      "reading": "タイム",
+      "x": 504.95,
+      "y": 415.95,
+      "radius": 44.0
+    },
+    {
+      "reading": "コーヒー",
+      "x": 549.95,
+      "y": 236.0,
+      "radius": 48.4,
+      "radiusY": 44.0
+    }
+  ],
+  "kata-ka": [
+    {
+      "reading": "エア",
+      "x": 540.95,
+      "y": 194.0,
+      "radius": 44.0
+    },
+    {
+      "reading": "オーケー",
+      "x": 248.0,
+      "y": 204.95,
+      "radius": 51.0,
+      "radiusY": 47.5
+    },
+    {
+      "reading": "ケーキ",
+      "x": 268.0,
+      "y": 392.95,
+      "radius": 44.0
+    },
+    {
+      "reading": "エコー",
+      "x": 526.95,
+      "y": 394.0,
+      "radius": 44.0
+    }
+  ],
+  "kata-ma": [
+    {
+      "reading": "ハム",
+      "x": 393.95,
+      "y": 129.0,
+      "radius": 44.0
+    },
+    {
+      "reading": "モニター",
+      "x": 249.0,
+      "y": 237.0,
+      "radius": 48.4,
+      "radiusY": 44.0
+    },
+    {
+      "reading": "マスク",
+      "x": 292.0,
+      "y": 415.95,
+      "radius": 44.0
+    },
+    {
+      "reading": "タイム",
+      "x": 504.95,
+      "y": 415.95,
+      "radius": 44.0
+    },
+    {
+      "reading": "コーヒー",
+      "x": 549.95,
+      "y": 236.0,
+      "radius": 48.4,
+      "radiusY": 44.0
+    }
+  ],
+  "kata-na": [
+    {
+      "reading": "ナース",
+      "x": 393.95,
+      "y": 129.0,
+      "radius": 44.0
+    },
+    {
+      "reading": "ノート",
+      "x": 249.0,
+      "y": 237.0,
+      "radius": 44.0
+    },
+    {
+      "reading": "ネクタイ",
+      "x": 292.0,
+      "y": 415.95,
+      "radius": 48.0,
+      "radiusY": 44.0
+    },
+    {
+      "reading": "カヌー",
+      "x": 504.95,
+      "y": 415.95,
+      "radius": 44.0
+    },
+    {
+      "reading": "テニス",
+      "x": 549.95,
+      "y": 236.0,
+      "radius": 44.0
+    }
+  ],
+  "kata-ra": [
+    {
+      "reading": "ヤクルト",
+      "x": 393.95,
+      "y": 129.0,
+      "radius": 48.4,
+      "radiusY": 44.0
+    },
+    {
+      "reading": "ミルク",
+      "x": 249.0,
+      "y": 237.0,
+      "radius": 43.55,
+      "radiusY": 44.0
+    },
+    {
+      "reading": "メール",
+      "x": 292.0,
+      "y": 415.95,
+      "radius": 44.0
+    },
+    {
+      "reading": "ホテル",
+      "x": 504.95,
+      "y": 415.95,
+      "radius": 44.0
+    },
+    {
+      "reading": "カメラ",
+      "x": 549.95,
+      "y": 236.0,
+      "radius": 44.0
+    }
+  ],
+  "kata-sa": [
+    {
+      "reading": "タクシー",
+      "x": 393.95,
+      "y": 129.0,
+      "radius": 48.4,
+      "radiusY": 44.0
+    },
+    {
+      "reading": "テスト",
+      "x": 249.0,
+      "y": 237.0,
+      "radius": 44.0
+    },
+    {
+      "reading": "セーター",
+      "x": 292.0,
+      "y": 415.95,
+      "radius": 48.0,
+      "radiusY": 44.0
+    },
+    {
+      "reading": "シート",
+      "x": 504.95,
+      "y": 415.95,
+      "radius": 44.0
+    },
+    {
+      "reading": "スキー",
+      "x": 549.95,
+      "y": 236.0,
+      "radius": 44.0
+    }
+  ],
+  "kata-ta": [
+    {
+      "reading": "タクシー",
+      "x": 393.95,
+      "y": 129.0,
+      "radius": 48.4,
+      "radiusY": 44.0
+    },
+    {
+      "reading": "テスト",
+      "x": 249.0,
+      "y": 237.0,
+      "radius": 44.0
+    },
+    {
+      "reading": "セーター",
+      "x": 292.0,
+      "y": 415.95,
+      "radius": 48.0,
+      "radiusY": 44.0
+    },
+    {
+      "reading": "シート",
+      "x": 504.95,
+      "y": 415.95,
+      "radius": 44.0
+    },
+    {
+      "reading": "スキー",
+      "x": 549.95,
+      "y": 236.0,
+      "radius": 44.0
+    }
+  ],
+  "kata-wa": [
+    {
+      "reading": "ワイン",
+      "x": 393.95,
+      "y": 129.0,
+      "radius": 44.0
+    },
+    {
+      "reading": "ラーメン",
+      "x": 242.4,
+      "y": 357.0,
+      "radius": 48.4,
+      "radiusY": 44.0
+    },
+    {
+      "reading": "ワンワン",
+      "x": 557.95,
+      "y": 351.0,
+      "radius": 48.4,
+      "radiusY": 44.0
+    }
+  ],
+  "kata-ya": [
+    {
+      "reading": "ヤクルト",
+      "x": 393.95,
+      "y": 129.0,
+      "radius": 48.4,
+      "radiusY": 44.0
+    },
+    {
+      "reading": "ミルク",
+      "x": 249.0,
+      "y": 237.0,
+      "radius": 43.55,
+      "radiusY": 44.0
+    },
+    {
+      "reading": "メール",
+      "x": 292.0,
+      "y": 415.95,
+      "radius": 44.0
+    },
+    {
+      "reading": "ホテル",
+      "x": 504.95,
+      "y": 415.95,
+      "radius": 44.0
+    },
+    {
+      "reading": "カメラ",
+      "x": 549.95,
+      "y": 236.0,
+      "radius": 44.0
+    }
   ]
 };
 
@@ -305,4 +618,3 @@ export function wordTarget(rowId, index) {
   const word = WORD_TARGETS[rowId]?.[index];
   return word ? { ...word, id: `${rowId}-word-${index}`, ruby: WORD_READINGS[word.reading] || '' } : null;
 }
-

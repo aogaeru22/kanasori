@@ -39,6 +39,7 @@ function openSqlite(path) {
     CREATE TABLE IF NOT EXISTS recovery_codes (teacher TEXT PRIMARY KEY REFERENCES teachers(id), hash TEXT NOT NULL, expires INTEGER NOT NULL, tries INTEGER NOT NULL);
     CREATE TABLE IF NOT EXISTS sheet_receipts (id TEXT PRIMARY KEY REFERENCES attempts(id), sentAt TEXT NOT NULL);
   `);
+  try { db.exec("ALTER TABLE classes ADD COLUMN script TEXT NOT NULL DEFAULT 'hiragana'"); } catch {}
   return wrapSqlite(db);
 }
 
@@ -129,6 +130,11 @@ function brokenStore(error) {
 
 async function migrate(sql) {
   for (const statement of SCHEMA_STATEMENTS) await sql.unsafe(statement);
+  try {
+    await sql.unsafe(`ALTER TABLE classes ADD COLUMN IF NOT EXISTS script text NOT NULL DEFAULT 'hiragana'`);
+  } catch (error) {
+    if (error.code !== '42701') throw error;
+  }
   for (const table of TABLES) {
     await sql.unsafe(`ALTER TABLE ${table} ENABLE ROW LEVEL SECURITY`);
     try {

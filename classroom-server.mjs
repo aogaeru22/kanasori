@@ -4,11 +4,14 @@ import { readFile, stat } from 'node:fs/promises';
 import { resolve, extname, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { openStore, hashPassword, verifyPassword } from './server/store.mjs';
-import { LESSONS, PASS_THRESHOLD } from './js/lessons.js';
+import { ALL_LESSONS, PASS_THRESHOLD } from './js/lessons.js';
 import { assess } from './js/score.js';
 import { wordTarget } from './js/word-targets.js';
 import { createSheetsSync } from './server/sheets.mjs';
 import { recognizedHiragana } from './server/hiragana.mjs';
+
+const CLASS_SCRIPTS = new Set(['hiragana', 'katakana']);
+const normalizeScript = value => CLASS_SCRIPTS.has(value) ? value : 'hiragana';
 
 const ROOT = fileURLToPath(new URL('.', import.meta.url));
 const MAX_BODY = 16 * 1024;
@@ -49,8 +52,8 @@ function clientIp(req) {
   return req.socket?.remoteAddress || 'unknown';
 }
 function findLesson(id) {
-  const match = /^(a|ka|sa|ta|na|ha|ma|ya|ra|wa)-word-([0-4])$/.exec(id);
-  return match ? wordTarget(match[1], Number(match[2])) : LESSONS.find(item => item.id === id);
+  const match = /^((?:kata-(?:a|ka|sa|ta|na|ha|ma|ya|ra|wa))|(?:a|ka|sa|ta|na|ha|ma|ya|ra|wa))-word-([0-4])$/.exec(id);
+  return match ? wordTarget(match[1], Number(match[2])) : ALL_LESSONS.find(item => item.id === id);
 }
 export function csvCell(value) {
   let text = String(value ?? '');
@@ -111,7 +114,7 @@ export function createApp({ db = openStore(resolve(process.env.DATA_DIR || 'data
         if (!req.headers['content-type']?.startsWith('application/json')) throw failure(415, 'JSON 요청이 필요합니다.');
       }
       const teacherRequest = path === '/api/login' || path === '/api/export' || path.startsWith('/api/teacher/');
-      if (path.startsWith('/api/teacher/') && !['/api/teacher/me','/api/teacher/attempts','/api/teacher/logout','/api/teacher/attendance','/api/teacher/roster','/api/teacher/roster/delete','/api/teacher/sheets'].includes(path)) throw failure(404, '찾을 수 없습니다.');
+      if (path.startsWith('/api/teacher/') && !['/api/teacher/me','/api/teacher/attempts','/api/teacher/logout','/api/teacher/attendance','/api/teacher/roster','/api/teacher/roster/delete','/api/teacher/sheets','/api/teacher/class-script'].includes(path)) throw failure(404, '찾을 수 없습니다.');
       if (path.startsWith('/api/teacher/')) path = path.replace('/api/teacher/', '/api/');
       const cookieName = teacherRequest ? 'kanasori_teacher' : 'kanasori';
       const cookie = new RegExp(`(?:^|;\\s*)${cookieName}=([a-f0-9]{64})(?:;|$)`).exec(req.headers.cookie || '')?.[1];
@@ -236,7 +239,18 @@ export function createApp({ db = openStore(resolve(process.env.DATA_DIR || 'data
       }
       if (path === '/api/me' && req.method === 'GET') {
         auth(); const classes = session.role === 'teacher' ? await db.prepare('SELECT c.id,c.name FROM classes c JOIN permissions p ON p.classId=c.id WHERE p.teacher=?').all(session.owner) : [];
-        return send(200, { role: session.role, name: session.name, number: session.number, classId: session.classId, classes, preview });
+        const classRow = session.classId ? await db.prepare('SELECT script FROM classes WHERE id=?').get(session.classId) : null;
+        return send(200, { role: session.role, name: session.name, number: session.number, classId: session.classId, script: normalizeScript(classRow?.script), classes, preview });
+      }
+      if (path === '/api/class-script' && req.method === 'POST') {
+        auth('teacher');
+        const data = await body();
+        const classId = text(data.classId, 80);
+        const script = normalizeScript(data.script);
+        if (!CLASS_SCRIPTS.has(data.script)) throw failure(400, '히라가나 또는 가타카나를 선택하세요.');
+        if (!await db.prepare('SELECT 1 FROM permissions WHERE teacher=? AND classId=?').get(session.owner, classId)) throw failure(403, '담당 학급만 확인할 수 있습니다.');
+        await db.prepare('UPDATE classes SET script=? WHERE id=?').run(script, classId);
+        return send(200, { ok: true, classId, script });
       }
       if (path === '/api/sheets' && req.method === 'GET') { auth('teacher'); return send(200, await sheets.status(session.owner)); }
       if (path === '/api/attendance' || path === '/api/roster' || path === '/api/roster/delete') {
@@ -324,7 +338,8 @@ export function createApp({ db = openStore(resolve(process.env.DATA_DIR || 'data
         }
         const day = schoolDay();
         const rows = await db.prepare("SELECT r.number,r.name,COALESCE(a.status,'absent') status FROM roster r LEFT JOIN attendance a ON a.classId=r.classId AND a.number=r.number AND a.day=? WHERE r.classId=? ORDER BY r.number").all(day,classId);
-        return send(200,{day,rows,total:rows.length,present:rows.filter(r=>r.status==='present').length});
+        const classRow = await db.prepare('SELECT script FROM classes WHERE id=?').get(classId);
+        return send(200,{day,rows,total:rows.length,present:rows.filter(r=>r.status==='present').length,script:normalizeScript(classRow?.script)});
       }
       if (path === '/api/reading' && req.method === 'POST') {
         auth('student'); limit(`reading:${session.owner}`, 40);

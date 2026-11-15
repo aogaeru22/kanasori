@@ -8,7 +8,7 @@ import { openStore, hashPassword } from '../server/store.mjs';
 test('student assessment, teacher password access, class isolation and CSV', async t => {
   const db = openStore(':memory:');
   for (const id of ['a','b']) {
-    db.prepare('INSERT INTO classes VALUES (?,?,?)').run(id,`학급 ${id}`,hashPassword('class-password'));
+    db.prepare('INSERT INTO classes (id, name, code) VALUES (?,?,?)').run(id,`학급 ${id}`,hashPassword('class-password'));
     db.prepare('INSERT INTO teachers VALUES (?,?,?)').run(id,`교사 ${id}`,hashPassword('teacher-password'));
     db.prepare('INSERT INTO permissions VALUES (?,?)').run(id,id);
   }

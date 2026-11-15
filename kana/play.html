@@ -37,12 +37,35 @@
     .mic-hint { max-width:90vw; }
     header, .bar, .pages, .status { display: none; }
     main { width: 100%; margin: 0; padding: 0; }
+    .script-tabs {
+      display: flex;
+      gap: 8px;
+      justify-content: center;
+      margin: 10px auto 8px;
+      width: min(calc(100vw - 20px), calc((100dvh - var(--below) - 64px) * 800 / 409));
+    }
+    .script-tabs button {
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--ink);
+      border-radius: 999px;
+      padding: 7px 14px;
+      font: inherit;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    .script-tabs button.active {
+      background: var(--ink);
+      border-color: var(--ink);
+      color: #fff;
+    }
+    .script-tabs button:focus-visible { outline: 3px solid #c4552a; outline-offset: 3px; }
     .kana-tabs {
       container-type: inline-size;
       display: flex;
       gap: 6px;
       width: min(calc(100vw - 20px), calc((100dvh - var(--below) - 64px) * 800 / 409));
-      margin: 10px auto 8px;
+      margin: 0 auto 8px;
     }
     .row-tab {
       flex: 1;
@@ -170,6 +193,7 @@
     .pronunciation-link:focus-visible { outline: 3px solid #c4552a; outline-offset: 3px; }
     body.words .pronunciation-link { display: none; }
     body.words .kana-tabs, body.words .practice-navigation { display: none; }
+    body.words .script-tabs { margin-bottom: 10px; }
     .return-link { display: none; }
     body.words .return-link {
       display: flex; align-items: center; justify-content: center; gap: .45em;
@@ -380,7 +404,11 @@
   </header>
   <nav class="learning-nav" aria-label="학습 메뉴"><a href="/">かな소리</a><span id="learner"></span><a href="/results.html">나의 결과</a><button id="endSession" type="button">학습 종료</button></nav><main>
     <div class="lesson-fit">
-    <nav class="kana-tabs" id="kanaTabs" aria-label="히라가나 행"></nav>
+    <nav class="script-tabs" id="scriptTabs" aria-label="학습 문자">
+      <button type="button" data-script="hiragana">히라가나</button>
+      <button type="button" data-script="katakana">가타카나</button>
+    </nav>
+    <nav class="kana-tabs" id="kanaTabs" aria-label="가나 행"></nav>
     <div class="bar" id="lessons"></div>
     <div class="bar" id="sections"></div>
     <div class="pages" id="pages"></div>
@@ -421,9 +449,10 @@
   </main>
   <script type="module">
     import { renderWarningIcons } from "../js/warning-icons.js";
-    import { LESSONS } from "../js/lessons.js";
-    import { setupPractice } from "../js/practice.js?v=69";
-    import { WORD_TARGETS, wordTarget } from "../js/word-targets.js?v=19-ma";
+    import { ALL_LESSONS, lessonsFor } from "../js/lessons.js?v=20-kata";
+    import { setupPractice } from "../js/practice.js?v=70";
+    import { WORD_TARGETS, wordTarget } from "../js/word-targets.js?v=20-kata";
+    import { api } from "../js/api.js";
     const lessonsEl = document.getElementById("lessons");
     const sectionsEl = document.getElementById("sections");
     const pagesEl = document.getElementById("pages");
@@ -432,14 +461,44 @@
     const params = new URLSearchParams(location.search);
     const wordMode = params.get('mode') === 'words';
     document.body.className = wordMode ? 'words' : 'writing';
-    const ROWS = LESSONS;
+    const requestedScript = params.get('script');
+    let script = requestedScript === 'katakana' || requestedScript === 'hiragana' ? requestedScript : null;
+    let ROWS = lessonsFor(script || 'hiragana');
     const tabsEl = document.getElementById("kanaTabs");
-    const preferred = ROWS.find(row => row.file === params.get("file"))?.file || ROWS[0].file;
+    const scriptTabsEl = document.getElementById("scriptTabs");
+    const rowBase = id => String(id || '').replace(/^kata-/, '');
+    const fileForScript = (nextScript, file) => {
+      const rows = lessonsFor(nextScript);
+      const current = ALL_LESSONS.find(row => row.file === file);
+      if (!current) return rows[0].file;
+      return rows.find(row => rowBase(row.id) === rowBase(current.id))?.file || rows[0].file;
+    };
+    const preferred = (() => {
+      const file = params.get("file");
+      if (file && ROWS.some(row => row.file === file)) return file;
+      if (file) {
+        const match = ALL_LESSONS.find(row => row.file === file);
+        if (match) {
+          script = match.script;
+          ROWS = lessonsFor(script);
+          return match.file;
+        }
+      }
+      return ROWS[0].file;
+    })();
 
     let catalog = null;
     let lesson = null;
     let section = null;
     let currentFile = preferred;
+
+    function practiceUrl(file, { mode = wordMode, nextScript = script } = {}) {
+      const query = new URLSearchParams();
+      query.set('file', file);
+      query.set('script', nextScript || 'hiragana');
+      if (mode) query.set('mode', 'words');
+      return `?${query}`;
+    }
 
     function setStatus(text, isError) {
       statusEl.textContent = text;
@@ -502,6 +561,27 @@
           play(currentFile);
         }));
       });
+    }
+
+    function renderScriptTabs() {
+      scriptTabsEl.querySelectorAll('button').forEach(button => {
+        const value = button.dataset.script;
+        button.classList.toggle('active', value === (script || 'hiragana'));
+        button.setAttribute('aria-pressed', value === (script || 'hiragana') ? 'true' : 'false');
+      });
+      tabsEl.setAttribute('aria-label', (script || 'hiragana') === 'katakana' ? '가타카나 행' : '히라가나 행');
+    }
+
+    function setScript(nextScript) {
+      if (practice.busy || !nextScript || nextScript === script) return;
+      script = nextScript;
+      currentFile = fileForScript(script, currentFile);
+      ROWS = lessonsFor(script);
+      selectedWord = null;
+      selection.hidden = true;
+      renderScriptTabs();
+      renderTabs();
+      play(currentFile);
     }
 
     function renderTabs() {
@@ -651,12 +731,12 @@
       renderWarningIcons(document.getElementById("warningOverlays"), selectedRow?.id, wordMode);
       document.getElementById('lessonRowTitle').textContent = selectedRow ? `${selectedRow.kana}행` : '';
       document.querySelector('.lesson-title-suffix').textContent = wordMode ? '발음연습' : '발음';
-      const historyUrl = "?file=" + encodeURIComponent(file) + (wordMode ? '&mode=words' : '');
-      document.getElementById('pronunciationLink').href = '?file=' + encodeURIComponent(file) + '&mode=words';
-      document.getElementById('backToWriting').href = '?file=' + encodeURIComponent(file);
-      document.getElementById('returnToWriting').href = '?file=' + encodeURIComponent(file);
+      const historyUrl = practiceUrl(file);
+      document.getElementById('pronunciationLink').href = practiceUrl(file, { mode: true });
+      document.getElementById('backToWriting').href = practiceUrl(file, { mode: false });
+      document.getElementById('returnToWriting').href = practiceUrl(file, { mode: false });
       const next = ROWS[ROWS.indexOf(selectedRow) + 1];
-      document.getElementById('nextRow').href = next ? '?file=' + encodeURIComponent(next.file) : '/results.html';
+      document.getElementById('nextRow').href = next ? practiceUrl(next.file, { mode: false }) : '/results.html';
       document.getElementById('nextRow').textContent = next ? `다음 ${next.kana}행 →` : '나의 결과 →';
       document.title = `${selectedRow?.kana || ''}행 ${wordMode ? '발음연습' : '획순·글자 연습'} · かな소리`;
       history.replaceState(null, "", historyUrl);
@@ -672,8 +752,8 @@
       player.style.height = "100%";
       player.style.touchAction = "none";
       stage.append(player);
-      const source = wordMode ? `voca_practice_hiragana/${selectedRow.id}행${selectedRow.id === 'wa' ? '_n' : ''}.swf` : file;
-      const open = () => player.load(source + "?v=19-ma").then(() => {
+      const source = wordMode ? selectedRow.voca : file;
+      const open = () => player.load(source + "?v=20-kata").then(() => {
         const pad = player.shadowRoot?.querySelector("canvas");
         if (pad) pad.style.touchAction = "none";
         const row = ROWS.find((item) => item.file === file);
@@ -697,14 +777,35 @@
       };
     }
 
-    render();
-    play(currentFile);
+    scriptTabsEl.addEventListener('click', event => {
+      const button = event.target.closest('button[data-script]');
+      if (button) setScript(button.dataset.script);
+    });
+
+    async function start() {
+      if (!script) {
+        try {
+          const me = await api('/api/me');
+          script = me.script === 'katakana' ? 'katakana' : 'hiragana';
+          ROWS = lessonsFor(script);
+          currentFile = fileForScript(script, currentFile);
+        } catch {
+          script = 'hiragana';
+          ROWS = lessonsFor(script);
+        }
+      }
+      renderScriptTabs();
+      render();
+      play(currentFile);
+    }
+
+    start();
 
     fetch("catalog.json")
       .then((response) => response.json())
       .then((data) => {
         catalog = data;
-        const found = locate(preferred);
+        const found = locate(currentFile);
         lesson = found.lesson;
         section = found.section;
         render();

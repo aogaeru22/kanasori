@@ -28,7 +28,8 @@ test('all 10 rows and 46 words capture final/interim speech, retry, and use 70 p
  assert.equal(PASS_THRESHOLD,70);
  t.mock.timers.enable({apis:['setTimeout']});
  for(const singleWord of [false,true]){
-   const targets=singleWord?Object.entries(WORD_TARGETS).flatMap(([id,words])=>words.map((_,i)=>wordTarget(id,i))):LESSONS;
+   const hiraganaWords=Object.entries(WORD_TARGETS).filter(([id])=>!id.startsWith('kata-'));
+   const targets=singleWord?hiraganaWords.flatMap(([id,words])=>words.map((_,i)=>wordTarget(id,i))):LESSONS;
    assert.equal(targets.length,singleWord?46:10);
    const practice=setupPractice(()=>selected,{singleWord});await flush();
    for(const target of targets){
@@ -224,5 +225,9 @@ test('all 10 rows and 46 words capture final/interim speech, retry, and use 70 p
  instance.onresult({results:[Object.assign([{transcript:'ひ'}],{isFinal:true})]});
  await flush();assert.equal(saved.at(-1).heard,'ひ');assert.equal(el('scoreNum').textContent,'0%');
  assert.equal(saved.length,beforeOther+1);
- assert.equal(captures,0);practice.clear();
+ assert.equal(captures,0);
+ selected=wordTarget('kata-a',0);assert.equal(selected.reading,'エア');el('micBtn').onclick();
+ instance.onresult({results:[Object.assign([{transcript:'エア'}],{isFinal:true})]});
+ await flush();assert.equal(saved.at(-1).heard,'えあ');assert.equal(el('scoreNum').textContent,'100%');
+ practice.clear();
 });

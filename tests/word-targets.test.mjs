@@ -7,9 +7,12 @@ import { assess } from '../js/score.js';
 import { createApp } from '../classroom-server.mjs';
 import { openStore, hashPassword } from '../server/store.mjs';
 
-test('all 46 visible words have distinct, bounded selectable circles', () => {
-  assert.equal(Object.values(WORD_TARGETS).flat().length, 46);
-  for (const [row, words] of Object.entries(WORD_TARGETS)) {
+test('all visible words have distinct, bounded selectable circles', () => {
+  const hiragana = Object.fromEntries(Object.entries(WORD_TARGETS).filter(([row]) => !row.startsWith('kata-')));
+  const katakana = Object.fromEntries(Object.entries(WORD_TARGETS).filter(([row]) => row.startsWith('kata-')));
+  assert.equal(Object.values(hiragana).flat().length, 46);
+  assert.equal(Object.keys(katakana).length, 10);
+  for (const [row, words] of Object.entries(hiragana)) {
     assert.equal(words.length, ['ya','wa'].includes(row) ? 3 : 5);
     for (const [index, word] of words.entries()) {
       assert.ok(word.x - word.radius > 0 && word.x + word.radius < 800);
@@ -17,6 +20,15 @@ test('all 46 visible words have distinct, bounded selectable circles', () => {
       assert.equal(assess(word.reading, word.reading).score, 100);
       assert.equal(wordTarget(row,index).reading, word.reading);
       for (const other of words.slice(index+1)) assert.ok(Math.hypot(word.x-other.x,word.y-other.y) > word.radius+other.radius);
+    }
+  }
+  for (const [row, words] of Object.entries(katakana)) {
+    assert.ok(words.length >= 3 && words.length <= 5, row);
+    for (const [index, word] of words.entries()) {
+      assert.ok(word.x - word.radius > 0 && word.x + word.radius < 800, `${row} ${word.reading}`);
+      assert.ok(word.y + word.radius < 520, `${row} ${word.reading}`);
+      assert.equal(assess(word.reading, word.reading).score, 100);
+      assert.equal(wordTarget(row,index).id, `${row}-word-${index}`);
     }
   }
   assert.equal(WORD_TARGETS.ta[1].reading,'ちかてつ');
@@ -30,6 +42,9 @@ test('all 46 visible words have distinct, bounded selectable circles', () => {
   assert.ok(WORD_TARGETS.na[4].x < 300);
   assert.equal(WORD_TARGETS.wa[2].radius,71); // Phrase has a larger circle.
   assert.equal(wordTarget('ya',4),null);
+  assert.equal(WORD_TARGETS['kata-a'][0].reading,'エア');
+  assert.equal(WORD_TARGETS['kata-wa'].length,3);
+  assert.equal(wordTarget('kata-a',0).id,'kata-a-word-0');
 });
 
 test('word scoring maps known kanji and marks only mismatched target characters', () => {
@@ -42,7 +57,7 @@ test('word scoring maps known kanji and marks only mismatched target characters'
 
 test('server validates and saves the selected word rather than the whole row', async t => {
   const db = openStore(':memory:');
-  db.prepare('INSERT INTO classes VALUES (?,?,?)').run('demo','테스트',hashPassword('test-class-code'));
+  db.prepare('INSERT INTO classes (id, name, code) VALUES (?,?,?)').run('demo','테스트',hashPassword('test-class-code'));
   db.prepare('INSERT INTO roster VALUES (?,?,?)').run('demo','test','가상 테스트');
   const {server} = createApp({db,studentClassId:'demo'});
   server.listen(0,'127.0.0.1'); await once(server,'listening');
@@ -72,4 +87,9 @@ test('server validates and saves the selected word rather than the whole row', a
   assert.deepEqual(await longVowel.json().then(({heard,score})=>({heard,score})),{heard:'おおい',score:100});
   const shortVowel=await post('/api/attempts',{id:randomUUID(),lesson:'a-word-1',heard:'おい'});
   assert.ok((await shortVowel.json()).score<100);
+  const kata=await post('/api/attempts',{id:randomUUID(),lesson:'kata-a-word-0',heard:'エア'});
+  assert.equal(kata.status,201);
+  assert.equal((await kata.json()).score,100);
+  const kataSaved=db.prepare("SELECT target,lesson,score FROM attempts WHERE lesson='kata-a-word-0'").get();
+  assert.deepEqual({...kataSaved},{target:'エア',lesson:'kata-a-word-0',score:100});
 });

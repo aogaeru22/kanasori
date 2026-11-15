@@ -12,7 +12,7 @@ try {
   await db.transaction(async tx => {
     if (action === 'class') {
       // The legacy code column is retained for existing databases; student entry no longer checks it.
-      await tx.prepare('INSERT INTO classes VALUES (?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name').run(id, name, hashPassword(randomUUID()));
+      await tx.prepare('INSERT INTO classes (id, name, code) VALUES (?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name').run(id, name, hashPassword(randomUUID()));
     } else {
       for (const classId of classIds) if (!await tx.prepare('SELECT id FROM classes WHERE id=?').get(classId)) throw new Error(`먼저 학급을 만드세요: ${classId}`);
       await tx.prepare('INSERT INTO teachers VALUES (?,?,?) ON CONFLICT(id) DO UPDATE SET name=excluded.name,password=excluded.password').run(id, name, hashPassword(process.env.SETUP_SECRET));

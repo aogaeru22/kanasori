@@ -4,7 +4,7 @@ import {openStore} from '../server/store.mjs';
 import {createSheetsSync} from '../server/sheets.mjs';
 test('sheet delivery retries failures, acknowledges IDs and survives worker restart', async()=>{
  const db=openStore(':memory:');
- db.exec("INSERT INTO classes VALUES ('class-301','3학년 1반','unused'); INSERT INTO teachers VALUES ('t','교사','unused'); INSERT INTO permissions VALUES ('t','class-301'); INSERT INTO attempts VALUES ('test-id','private-session','class-301','30101','테스트','a','あ','あ',100,1,'2026-09-26T00:00:00Z')");
+ db.exec("INSERT INTO classes (id, name, code) VALUES ('class-301','3학년 1반','unused'); INSERT INTO teachers VALUES ('t','교사','unused'); INSERT INTO permissions VALUES ('t','class-301'); INSERT INTO attempts VALUES ('test-id','private-session','class-301','30101','테스트','a','あ','あ',100,1,'2026-09-26T00:00:00Z')");
  let calls=0, bad=true;
  const options={url:'https://script.google.com/macros/s/test/exec',token:'test-secret',fetcher:async(url,opts)=>{
   calls++; const body=JSON.parse(opts.body); assert.equal(body.record.owner,undefined); assert.equal(body.record.className,'3학년 1반');

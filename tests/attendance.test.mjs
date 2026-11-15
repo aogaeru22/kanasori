@@ -7,7 +7,7 @@ import { openStore, hashPassword } from '../server/store.mjs';
 test('roster validation, daily attendance, manual corrections and teacher isolation', async t => {
   const db=openStore(':memory:');
   for(const id of ['a','b']) {
-    db.prepare('INSERT INTO classes VALUES (?,?,?)').run(id,id,'unused');
+    db.prepare('INSERT INTO classes (id, name, code) VALUES (?,?,?)').run(id,id,'unused');
     db.prepare('INSERT INTO teachers VALUES (?,?,?)').run(id,id,hashPassword('password-'+id));
     db.prepare('INSERT INTO permissions VALUES (?,?)').run(id,id);
   }
@@ -24,6 +24,12 @@ test('roster validation, daily attendance, manual corrections and teacher isolat
   assert.equal((await call('/api/teacher/attendance?classId=a')).status,401);
   assert.equal((await call('/api/teacher/attendance?classId=b',null,cookie)).status,403);
   const read=async()=> (await call('/api/teacher/attendance?classId=a',null,cookie)).json();
+  assert.equal((await read()).script,'hiragana');
+  assert.equal((await call('/api/teacher/class-script',{classId:'a',script:'katakana'},cookie)).status,200);
+  assert.equal((await read()).script,'katakana');
+  assert.equal((await call('/api/teacher/class-script',{classId:'b',script:'hiragana'},cookie)).status,403);
+  assert.equal((await call('/api/teacher/class-script',{classId:'a',script:'hangul'},cookie)).status,400);
+  assert.equal((await call('/api/teacher/class-script',{classId:'a',script:'hiragana'},cookie)).status,200);
   assert.equal((await read()).total,2);assert.equal((await read()).present,0);
   assert.equal((await call('/api/join',{number:'20101',name:'틀린 이름',consent:true})).status,400);
   assert.equal((await call('/api/join',{number:'99999',name:'김하루',consent:true})).status,400);
@@ -51,7 +57,12 @@ test('roster validation, daily attendance, manual corrections and teacher isolat
   db.prepare('INSERT INTO roster VALUES (?,?,?)').run('b','20701','다른 반');
   response=await call('/api/join',{number:'20701',name:'다른 반',consent:true});assert.equal(response.status,200);
   const studentCookie=response.headers.get('set-cookie').split(';')[0];
-  assert.equal((await (await call('/api/me',null,studentCookie)).json()).classId,'b');
+  const me=await (await call('/api/me',null,studentCookie)).json();
+  assert.equal(me.classId,'b');
+  assert.equal(me.script,'hiragana');
+  assert.equal((await call('/api/teacher/class-script',{classId:'b',script:'katakana'},cookie)).status,403);
+  db.prepare("UPDATE classes SET script='katakana' WHERE id='b'").run();
+  assert.equal((await (await call('/api/me',null,studentCookie)).json()).script,'katakana');
   assert.equal((await call('/api/teacher/attendance?classId=b',null,studentCookie)).status,401);
   const wrongDelete = await call('/api/teacher/roster/delete',{classId:'a',students:[{number:'20102',name:'다른 사람'}]},cookie);
   assert.equal(wrongDelete.status,400);
