@@ -152,13 +152,13 @@
     .write-pad {
       position: absolute;
       z-index: 4;
-      left: calc(390 / 800 * 100%);
-      top: calc((240 - 71) / 409 * 100%);
-      width: calc(310 / 800 * 100%);
-      height: calc((430 - 240) / 409 * 100%);
+      left: calc(398 / 800 * 100%);
+      top: calc((248 - 71) / 409 * 100%);
+      width: calc(294 / 800 * 100%);
+      height: calc((428 - 248) / 409 * 100%);
       touch-action: none;
       cursor: crosshair;
-      background: #fff;
+      background: transparent;
       border: 0;
       padding: 0;
       display: none;
@@ -664,7 +664,7 @@
         { id: 'clearBtn', x: 619.0, y: 443.1, r: 36 },
       ];
       const hasRaw = 'onpointerrawupdate' in window;
-      const ctx = writePad.getContext('2d', { alpha: false, desynchronized: true }) || writePad.getContext('2d');
+      const ctx = writePad.getContext('2d', { alpha: true, desynchronized: true }) || writePad.getContext('2d');
       let strokes = [];
       let current = [];
       let drawing = false;
@@ -717,8 +717,8 @@
         if (!ctx) return;
         const width = writePad.width;
         const height = writePad.height;
-        ctx.fillStyle = '#fff';
-        ctx.fillRect(0, 0, width, height);
+        // Keep the canvas transparent so the Flash board frame stays visible underneath.
+        ctx.clearRect(0, 0, width, height);
         for (const stroke of strokes) {
           if (!stroke.points.length) continue;
           stylePen(stroke.color);
