@@ -269,6 +269,13 @@ export function createApp({ db = openStore(resolve(process.env.DATA_DIR || 'data
         await db.prepare('UPDATE classes SET endedAt=? WHERE id=?').run(Date.now(), classId);
         return send(200, { ok: true, classId, ended: true });
       }
+      if (path === '/api/resume-class' && req.method === 'POST') {
+        auth('student');
+        await body().catch(() => ({}));
+        if (!session.classId) throw failure(400, '학급 정보가 없습니다.');
+        await db.prepare('UPDATE classes SET endedAt=NULL WHERE id=?').run(session.classId);
+        return send(200, { ok: true, classId: session.classId, ended: false });
+      }
       if (path === '/api/sheets' && req.method === 'GET') { auth('teacher'); return send(200, await sheets.status(session.owner)); }
       if (path === '/api/attendance' || path === '/api/roster' || path === '/api/roster/delete') {
         auth('teacher');

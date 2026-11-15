@@ -49,12 +49,16 @@ async function refresh() {
 }
 
 $('refresh').onclick = refresh;
-$('logout').onclick = async () => {
+$('resumeLearning').onclick = async () => {
+  $('resumeLearning').disabled = true;
+  $('message').textContent = '';
   try {
-    await api('/api/logout', {});
-    location.replace('/');
+    await api('/api/resume-class', {});
+    location.replace('/kana/play.html');
   } catch (error) {
     $('message').textContent = error.message;
+    $('resumeLearning').disabled = false;
+    if (error.status === 401) location.replace('/');
   }
 };
 refresh();
