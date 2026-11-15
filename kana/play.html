@@ -659,37 +659,35 @@
     // area so the Flash frame, clear button, and crayon stay visible.
     const writePad = document.getElementById('writePad');
     const writePadApi = (() => {
-      const MIN_STEP = 0.002;
-      const START_MOVE = 0.0025;
-      const TELEPORT = 0.18;
-      const hasRaw = 'onpointerrawupdate' in window;
+      const MIN_STEP = 0.0015;
+      const TELEPORT = 0.2;
       const ctx = writePad.getContext('2d', { alpha: false }) || writePad.getContext('2d');
       let strokes = [];
       let current = [];
       let drawing = false;
-      let started = false;
       let pointerId = null;
-      let origin = null;
-      let padRect = null;
-      let lastInk = null;
+      let padLeft = 0;
+      let padTop = 0;
+      let padW = 1;
+      let padH = 1;
+      let lastX = 0;
+      let lastY = 0;
+      let penReady = false;
       const clamp01 = v => Math.max(0, Math.min(1, v));
-      const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
-      const lineWidth = () => Math.max(5, writePad.width * 0.015);
-      const refreshRect = () => { padRect = writePad.getBoundingClientRect(); };
-      const pointFromEvent = event => {
-        const rect = padRect || writePad.getBoundingClientRect();
-        if (!rect.width || !rect.height) return null;
-        return {
-          x: clamp01((event.clientX - rect.left) / rect.width),
-          y: clamp01((event.clientY - rect.top) / rect.height),
-        };
+      const refreshRect = () => {
+        const rect = writePad.getBoundingClientRect();
+        padLeft = rect.left;
+        padTop = rect.top;
+        padW = rect.width || 1;
+        padH = rect.height || 1;
       };
-      const stylePen = () => {
-        if (!ctx) return;
+      const applyPen = () => {
+        if (!ctx || penReady) return;
         ctx.lineCap = 'round';
         ctx.lineJoin = 'round';
         ctx.strokeStyle = '#1a1a1a';
-        ctx.lineWidth = lineWidth();
+        ctx.lineWidth = Math.max(5, writePad.width * 0.015);
+        penReady = true;
       };
       const strokePath = (points, width, height) => {
         if (!points.length || !ctx) return;
@@ -699,25 +697,18 @@
           ctx.lineTo(points[0].x * width + 0.01, points[0].y * height);
           return;
         }
-        if (points.length === 2) {
-          ctx.lineTo(points[1].x * width, points[1].y * height);
-          return;
+        for (let i = 1; i < points.length; i += 1) {
+          ctx.lineTo(points[i].x * width, points[i].y * height);
         }
-        for (let i = 1; i < points.length - 1; i += 1) {
-          const a = points[i];
-          const b = points[i + 1];
-          ctx.quadraticCurveTo(a.x * width, a.y * height, ((a.x + b.x) / 2) * width, ((a.y + b.y) / 2) * height);
-        }
-        const last = points[points.length - 1];
-        ctx.lineTo(last.x * width, last.y * height);
       };
       const paintAll = () => {
         if (!ctx) return;
+        penReady = false;
         const width = writePad.width;
         const height = writePad.height;
         ctx.fillStyle = '#fff';
         ctx.fillRect(0, 0, width, height);
-        stylePen();
+        applyPen();
         for (const stroke of strokes) {
           if (!stroke.length) continue;
           strokePath(stroke, width, height);
@@ -728,44 +719,17 @@
           ctx.stroke();
         }
       };
-      const inkSegment = (from, to) => {
-        if (!ctx || !from || !to) return;
-        const width = writePad.width;
-        const height = writePad.height;
-        stylePen();
-        ctx.beginPath();
-        ctx.moveTo(from.x * width, from.y * height);
-        ctx.lineTo(to.x * width, to.y * height);
-        ctx.stroke();
-      };
       const resize = () => {
         refreshRect();
-        const dpr = Math.min(window.devicePixelRatio || 1, 2);
-        const nextW = Math.max(1, Math.round((padRect?.width || 1) * dpr));
-        const nextH = Math.max(1, Math.round((padRect?.height || 1) * dpr));
+        const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+        const nextW = Math.max(1, Math.round(padW * dpr));
+        const nextH = Math.max(1, Math.round(padH * dpr));
         if (writePad.width !== nextW || writePad.height !== nextH) {
           writePad.width = nextW;
           writePad.height = nextH;
+          penReady = false;
         }
         paintAll();
-      };
-      const pushPoint = point => {
-        const last = current[current.length - 1];
-        if (!last) {
-          current.push(point);
-          lastInk = point;
-          return;
-        }
-        const gap = dist(last, point);
-        if (gap < MIN_STEP) return;
-        if (gap > TELEPORT) {
-          current.push(point);
-          lastInk = point;
-          return;
-        }
-        current.push(point);
-        inkSegment(lastInk, point);
-        lastInk = point;
       };
       const endStroke = event => {
         if (!drawing || (event && pointerId !== null && event.pointerId !== pointerId)) return;
@@ -774,29 +738,34 @@
             writePad.releasePointerCapture(pointerId);
           }
         } catch (_) {}
-        if (started && current.length >= 2) strokes.push(current.slice());
+        if (current.length >= 1) strokes.push(current.slice());
         drawing = false;
-        started = false;
         pointerId = null;
-        origin = null;
         current = [];
-        lastInk = null;
-        paintAll();
+        // Keep pixels as drawn — no full redraw hitch at lift.
       };
       const onDown = event => {
         if (drawing || event.type !== 'pointerdown' || !event.isPrimary || event.button !== 0) return;
         refreshRect();
-        const point = pointFromEvent(event);
-        if (!point) return;
+        const x = clamp01((event.clientX - padLeft) / padW);
+        const y = clamp01((event.clientY - padTop) / padH);
         event.preventDefault();
         event.stopPropagation();
         try { writePad.setPointerCapture(event.pointerId); } catch (_) {}
         pointerId = event.pointerId;
         drawing = true;
-        started = false;
-        origin = point;
-        current = [];
-        lastInk = null;
+        lastX = x;
+        lastY = y;
+        current = [{ x, y }];
+        applyPen();
+        // Immediate tip so the stroke starts without a dead zone.
+        const width = writePad.width;
+        const height = writePad.height;
+        ctx.beginPath();
+        ctx.fillStyle = '#1a1a1a';
+        ctx.arc(x * width, y * height, ctx.lineWidth / 2, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.strokeStyle = '#1a1a1a';
       };
       const onMove = event => {
         if (!drawing || event.pointerId !== pointerId) return;
@@ -806,58 +775,55 @@
         }
         event.preventDefault();
         event.stopPropagation();
-        const rawSamples = event.getCoalescedEvents?.() ?? [];
-        const samples = rawSamples.length ? rawSamples : [event];
-        for (const sample of samples) {
-          const point = pointFromEvent(sample);
-          if (!point) continue;
-          if (!started) {
-            if (!origin) { origin = point; continue; }
-            const gap = dist(origin, point);
-            if (gap > TELEPORT) { origin = point; continue; }
-            if (gap < START_MOVE) continue;
-            started = true;
-            current = [origin, point];
-            lastInk = origin;
-            inkSegment(origin, point);
-            lastInk = point;
+        const samples = event.getCoalescedEvents?.() ?? [];
+        const list = samples.length ? samples : [event];
+        applyPen();
+        const width = writePad.width;
+        const height = writePad.height;
+        ctx.beginPath();
+        ctx.moveTo(lastX * width, lastY * height);
+        let drew = false;
+        for (const sample of list) {
+          const x = clamp01((sample.clientX - padLeft) / padW);
+          const y = clamp01((sample.clientY - padTop) / padH);
+          const gap = Math.hypot(x - lastX, y - lastY);
+          if (gap < MIN_STEP) continue;
+          if (gap > TELEPORT) {
+            lastX = x;
+            lastY = y;
+            current.push({ x, y });
+            ctx.moveTo(x * width, y * height);
             continue;
           }
-          pushPoint(point);
+          ctx.lineTo(x * width, y * height);
+          lastX = x;
+          lastY = y;
+          current.push({ x, y });
+          drew = true;
         }
+        if (drew) ctx.stroke();
       };
       const clear = () => {
         strokes = [];
         current = [];
         drawing = false;
-        started = false;
         pointerId = null;
-        origin = null;
-        lastInk = null;
+        penReady = false;
         paintAll();
       };
-      // Clear button lives in Flash; also clear our pad when that region is tapped.
       const onClearHit = event => {
         if (wordMode || event.button !== 0) return;
         const rect = stage.parentElement.getBoundingClientRect();
         if (!rect.width || !rect.height) return;
         const x = (event.clientX - rect.left) / rect.width * 800;
         const y = (event.clientY - rect.top) / rect.height * 409 + 71;
-        if (Math.hypot(x - 545.5, y - 443.1) <= 40) clear();
+        if (Math.hypot(x - 546, y - 443.1) <= 40) clear();
       };
       writePad.addEventListener('pointerdown', onDown);
-      writePad.addEventListener('pointermove', event => {
-        if (hasRaw && drawing && event.pointerId === pointerId) {
-          event.preventDefault();
-          event.stopPropagation();
-          return;
-        }
-        onMove(event);
-      });
-      if (hasRaw) writePad.addEventListener('pointerrawupdate', onMove);
+      // pointermove + coalesced samples only — rawupdate flooded Chromebooks and caused stalls.
+      writePad.addEventListener('pointermove', onMove);
       writePad.addEventListener('pointerup', endStroke);
       writePad.addEventListener('pointercancel', endStroke);
-      writePad.addEventListener('lostpointercapture', endStroke);
       stage.parentElement.addEventListener('pointerdown', onClearHit, true);
       window.addEventListener('resize', resize);
       resize();
