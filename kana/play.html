@@ -987,13 +987,13 @@
       if (button) setScript(button.dataset.script);
     });
 
-    const ZOOM_STEPS = [0.7, 0.8, 0.9, 1, 1.1];
+    const ZOOM_STEPS = [0.5, 0.6, 0.7, 0.8, 0.9, 1];
     const ZOOM_KEY = 'kanasori-lesson-zoom';
     const zoomOutBtn = document.getElementById('zoomOut');
     const zoomInBtn = document.getElementById('zoomIn');
     const zoomLabel = document.getElementById('zoomLabel');
     const nearestZoom = value => ZOOM_STEPS.reduce((best, step) => Math.abs(step - value) < Math.abs(best - value) ? step : best, 1);
-    let lessonZoom = nearestZoom(Number(localStorage.getItem(ZOOM_KEY)) || 1);
+    let lessonZoom = nearestZoom(Math.min(1, Number(localStorage.getItem(ZOOM_KEY)) || 1));
     const applyZoom = () => {
       document.documentElement.style.setProperty('--lesson-zoom', String(lessonZoom));
       zoomLabel.textContent = `${Math.round(lessonZoom * 100)}%`;
