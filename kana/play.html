@@ -624,12 +624,11 @@
     let selectedWord = null;
     const practice = setupPractice(() => wordMode ? selectedWord : ROWS.find(row => row.file === currentFile) || ROWS[0], { singleWord: wordMode });
     const selection = document.getElementById('wordSelection');
-    // Writing board (Flash/Ruffle): keep the original board UI. Only
-    // 1) park the pen at each new tap so strokes don't connect, and
-    // 2) block idle hover over the pad (that was inking before contact).
-    // Do not overlay a second canvas and do not rewrite in-stroke moves.
+    // Writing board (Flash/Ruffle): keep original board drawing.
+    // Block idle hover on the pad (inks before contact / leaves stale pen position).
+    // On each new tap, park with buttons=0 then let the trusted down reach Ruffle.
     if (!wordMode) {
-      let strokeId = null;
+      let emitting = false;
       const boardHas = event => {
         const rect = stage.getBoundingClientRect();
         if (!rect.width || !rect.height) return false;
@@ -642,50 +641,27 @@
         return path.find(node => node && node.tagName === 'CANVAS') || path[0] || event.target;
       };
       stage.addEventListener('pointerdown', event => {
-        if (event.button !== 0 || !boardHas(event)) return;
+        if (emitting || event.button !== 0 || !boardHas(event)) return;
         const target = surface(event);
-        // MoveTo the tap before press — stops connector lines between strokes.
-        target.dispatchEvent(new PointerEvent('pointermove', {
-          bubbles: true, cancelable: true, composed: true, view: window,
-          pointerId: event.pointerId, pointerType: event.pointerType || 'touch',
-          isPrimary: true, button: -1, buttons: 0,
-          clientX: event.clientX, clientY: event.clientY, pressure: 0,
-        }));
-        strokeId = event.pointerId;
-        try { target.setPointerCapture?.(event.pointerId); } catch (_) {}
+        emitting = true;
+        try {
+          target.dispatchEvent(new PointerEvent('pointermove', {
+            bubbles: true, cancelable: true, composed: true, view: window,
+            pointerId: event.pointerId, pointerType: event.pointerType || 'touch',
+            isPrimary: true, button: -1, buttons: 0,
+            clientX: event.clientX, clientY: event.clientY, pressure: 0,
+          }));
+        } finally {
+          emitting = false;
+        }
       }, true);
       stage.addEventListener('pointermove', event => {
-        if (event.buttons !== 0) {
-          // While drawing, also feed coalesced samples for smoother Chromebook input.
-          if (strokeId !== null && event.pointerId === strokeId) {
-            const points = event.getCoalescedEvents?.() ?? [];
-            if (points.length > 1) {
-              const target = surface(event);
-              for (let i = 0; i < points.length - 1; i += 1) {
-                const point = points[i];
-                target.dispatchEvent(new PointerEvent('pointermove', {
-                  bubbles: true, cancelable: true, composed: true, view: window,
-                  pointerId: event.pointerId, pointerType: event.pointerType || 'touch',
-                  isPrimary: true, button: 0, buttons: 1,
-                  clientX: point.clientX, clientY: point.clientY,
-                  pressure: Math.max(Number(point.pressure) || 0, 0.5),
-                }));
-              }
-            }
-          }
-          return;
-        }
-        if (boardHas(event)) {
+        if (emitting) return;
+        if (event.buttons === 0 && boardHas(event)) {
           event.stopPropagation();
           event.preventDefault();
         }
       }, true);
-      const endStroke = event => {
-        if (strokeId === null || event.pointerId !== strokeId) return;
-        strokeId = null;
-      };
-      window.addEventListener('pointerup', endStroke, true);
-      window.addEventListener('pointercancel', endStroke, true);
     }
     stage.addEventListener('pointerdown', event => {
       if (!wordMode) return;
@@ -748,7 +724,7 @@
       player.style.touchAction = "none";
       stage.append(player);
       const source = wordMode ? selectedRow.voca : file;
-      const open = () => player.load(source + "?v=20-kata").then(() => {
+      const open = () => player.load(source + "?v=21-nocolor").then(() => {
         const pad = player.shadowRoot?.querySelector("canvas");
         if (pad) pad.style.touchAction = "none";
         const row = ROWS.find((item) => item.file === file);
