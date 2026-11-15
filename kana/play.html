@@ -540,15 +540,16 @@
     let selectedWord = null;
     const practice = setupPractice(() => wordMode ? selectedWord : ROWS.find(row => row.file === currentFile) || ROWS[0], { singleWord: wordMode });
     const selection = document.getElementById('wordSelection');
-    // The lesson movie draws with lineTo on every mouse move after mouseDown.
-    // Chromebook touchpads report a held button while the cursor is only
-    // moving, and a lifted finger sometimes never delivers mouseUp, so the
-    // pen keeps stroking straight lines before the next touch. A stroke
-    // starts only after a new press on the writing board, and the points
-    // in between are filled in so the line follows a finger smoothly.
+    // The lesson movie draws with lineTo on every mouse move after mouseDown,
+    // and a lifted finger sometimes never delivers mouseUp. Moves over the
+    // writing board are ignored until a press starts there, so a hand
+    // approaching the screen cannot draw. A press that began outside never
+    // delivers pointerdown on the board, so those moves stay blocked too.
+    // Chrome's pointermove is sparse. pointerrawupdate has the samples in
+    // between; Ruffle only listens for pointermove and reads offsetX, so the
+    // samples are forwarded to the same canvas.
     if (!wordMode) {
       const hasRaw = 'onpointerrawupdate' in window;
-      let arrivedHolding = false;
       let emitting = false;
       let stroke = null;
       const boardHas = event => {
@@ -561,65 +562,54 @@
       const halt = event => { event.stopPropagation(); event.preventDefault(); };
       const surface = event => event.composedPath()[0] || event.target;
       const emit = (target, type, source, x, y, buttons) => {
+        if (!target) return;
         emitting = true;
-        target.dispatchEvent(new PointerEvent(type, {
-          bubbles: true, cancelable: true, composed: true, view: window,
-          pointerId: source.pointerId, pointerType: source.pointerType, isPrimary: true,
-          button: 0, buttons, clientX: x, clientY: y, pressure: buttons ? 0.5 : 0,
-        }));
-        emitting = false;
-      };
-      // A long jump is a cursor entering the board, not a pen stroke. Lift
-      // and press again so the movie moves the pen instead of drawing a line.
-      const trace = (target, source, x, y) => {
-        const distance = Math.hypot(x - stroke.x, y - stroke.y);
-        if (distance > 72) {
-          emit(target, 'pointerup', source, stroke.x, stroke.y, 0);
-          emit(target, 'pointerdown', source, x, y, 1);
-          stroke.x = x; stroke.y = y;
-          return;
+        try {
+          target.dispatchEvent(new PointerEvent(type, {
+            bubbles: true, cancelable: true, composed: true, view: window,
+            pointerId: source.pointerId, pointerType: source.pointerType, isPrimary: true,
+            button: 0, buttons, clientX: x, clientY: y, pressure: buttons ? 0.5 : 0,
+          }));
+        } finally {
+          emitting = false;
         }
-        const steps = Math.max(1, Math.ceil(distance / 3));
-        for (let step = 1; step <= steps; step += 1) {
-          const ratio = step / steps;
-          emit(target, 'pointermove', source, stroke.x + (x - stroke.x) * ratio, stroke.y + (y - stroke.y) * ratio, 1);
-        }
-        stroke.x = x; stroke.y = y;
       };
-      stage.addEventListener('pointerenter', event => { arrivedHolding = event.buttons !== 0; }, true);
       stage.addEventListener('pointerdown', event => {
         if (emitting || event.button !== 0 || !boardHas(event)) return;
-        if (arrivedHolding) { halt(event); return; }
-        stroke = { id: event.pointerId, x: event.clientX, y: event.clientY };
-        arrivedHolding = false;
+        stroke = { id: event.pointerId, x: event.clientX, y: event.clientY, target: surface(event) };
       }, true);
       const follow = event => {
         if (emitting) return;
-        const drawing = stroke && event.pointerId === stroke.id && event.buttons !== 0;
-        if (!drawing) { if (boardHas(event)) halt(event); return; }
+        if (!stroke || event.pointerId !== stroke.id || event.buttons === 0) {
+          if (boardHas(event)) halt(event);
+          return;
+        }
         halt(event);
-        const target = surface(event);
-        const points = event.getCoalescedEvents?.() || [event];
-        for (const point of points) trace(target, event, point.clientX, point.clientY);
+        const points = event.getCoalescedEvents?.() ?? [];
+        const samples = points.length ? points : [event];
+        for (const point of samples) {
+          emit(stroke.target, 'pointermove', event, point.clientX, point.clientY, 1);
+          stroke.x = point.clientX;
+          stroke.y = point.clientY;
+        }
       };
       stage.addEventListener('pointermove', event => {
         if (emitting) return;
-        if (stroke && hasRaw && event.pointerId === stroke.id) { halt(event); return; }
+        if (stroke && hasRaw && event.pointerId === stroke.id && event.buttons !== 0) { halt(event); return; }
         follow(event);
       }, true);
       if (hasRaw) stage.addEventListener('pointerrawupdate', follow, true);
-      const releasePen = event => {
+      window.addEventListener('pointerup', event => {
         if (emitting) return;
         if (stroke && event.pointerId === stroke.id) stroke = null;
-        arrivedHolding = false;
-      };
-      window.addEventListener('pointerup', releasePen, true);
+      }, true);
       window.addEventListener('pointercancel', event => {
-        if (stroke && event.pointerId === stroke.id) {
-          emit(surface(event), 'pointerup', event, event.clientX, event.clientY, 0);
-          stroke = null;
-        }
-        arrivedHolding = false;
+        if (emitting || !stroke || event.pointerId !== stroke.id) return;
+        const target = stroke.target;
+        const x = event.clientX;
+        const y = event.clientY;
+        stroke = null;
+        emit(target, 'pointerup', event, x, y, 0);
       }, true);
     }
     stage.addEventListener('pointerdown', event => {
