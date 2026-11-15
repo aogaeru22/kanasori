@@ -379,10 +379,10 @@ export function setupPractice(getRow, { singleWord = false } = {}) {
     scrollTo($('speakingCard'));
   };
   $('saveRetry').onclick = save;
-  $('endSession').onclick = async () => {
-    if (busy) { hint('진행 중인 연습과 저장을 마친 뒤 종료해 주세요.'); return; }
-    try { await api('/api/logout',{}); location.replace('/'); }
-    catch (error) { hint(error.message); }
+  const goEnded = () => { location.replace('/results.html?ended=1'); };
+  const watchClassEnd = me => {
+    if (me?.ended) { goEnded(); return true; }
+    return false;
   };
   window.addEventListener('beforeunload', event => { if (busy || pending) { event.preventDefault(); event.returnValue = ''; } });
   window.addEventListener('pagehide', () => feedbackVoice.stop());
@@ -392,6 +392,7 @@ export function setupPractice(getRow, { singleWord = false } = {}) {
   $('retryBtn').disabled = true;
   api('/api/me').then(me => {
     if (me.role !== 'student') { location.replace('/'); return; }
+    if (watchClassEnd(me)) return;
     $('learner').textContent = `${me.number} ${me.name}`;
     ready = true;
     $('micBtn').disabled = false; $('retryBtn').disabled = false;
@@ -399,6 +400,12 @@ export function setupPractice(getRow, { singleWord = false } = {}) {
     if (error.status === 401) location.replace('/');
     else hint(error.message);
   });
+  setInterval(() => {
+    if (document.visibilityState === 'hidden') return;
+    api('/api/me').then(watchClassEnd).catch(error => {
+      if (error.status === 401) location.replace('/');
+    });
+  }, 4000);
   const changeSelection = () => {
     if (pending) {
       hint('결과 저장을 마친 뒤 단어를 바꿀 수 있어요. 저장 실패 시 결과 저장 재시도를 눌러 주세요.');

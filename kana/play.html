@@ -31,25 +31,37 @@
       background: linear-gradient(180deg, #fbf7f1, #f3eee6);
       overflow: auto;
     }
-    .learning-nav { display:flex; align-items:center; justify-content:center; gap:16px; padding:10px; min-height:52px; font-size:16px; flex-wrap:wrap; }
-    .learning-nav a { color:var(--indigo); }
+    .learning-nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      padding: 10px 16px;
+      min-height: 52px;
+      font-size: 16px;
+      width: 100%;
+      box-sizing: border-box;
+    }
+    .learning-nav a { color: var(--indigo); text-decoration: none; }
+    .nav-left { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; min-width: 0; }
+    .nav-brand { font-weight: 800; white-space: nowrap; }
+    #learner { font-weight: 700; white-space: nowrap; margin-left: auto; }
     #saveRetry { margin:8px; }
     .mic-hint { max-width:90vw; }
     header, .bar, .pages, .status { display: none; }
     main { width: 100%; margin: 0; padding: 0; }
     .script-tabs {
       display: flex;
-      gap: 8px;
-      justify-content: center;
-      margin: 10px auto 8px;
-      width: min(calc(100vw - 20px), calc((100dvh - var(--below) - 64px) * 800 / 409));
+      gap: 6px;
+      margin: 0;
+      width: auto;
     }
     .script-tabs button {
       border: 1px solid #e7dccb;
       background: #fffdf9;
       color: #243e66;
       border-radius: 999px;
-      padding: 7px 14px;
+      padding: 6px 12px;
       font: inherit;
       font-weight: 700;
       cursor: pointer;
@@ -149,22 +161,24 @@
       touch-action: none;
     }
     .stage ruffle-player, .stage ruffle-object { width: 100%; height: 100%; display: block; touch-action: none; }
-    /* Opaque white ink over the Flash pad interior. Bottom/right reach the
-       white board edge so strokes are not clipped short of the gray frame. */
+    /* Fill the Flash pad's white interior (shape 419–672 × 264–426).
+       Radius matches the pad's own rounded corner so the edge meets the gray bezel. */
     .write-pad {
       position: absolute;
       z-index: 4;
-      left: calc(418 / 800 * 100%);
-      top: calc((268 - 71) / 409 * 100%);
-      width: calc((662 - 418) / 800 * 100%);
-      height: calc((432 - 268) / 409 * 100%);
+      left: calc(419 / 800 * 100%);
+      top: calc((264 - 71) / 409 * 100%);
+      width: calc((672 - 419) / 800 * 100%);
+      height: calc((426 - 264) / 409 * 100%);
       touch-action: none;
       cursor: crosshair;
       background: #fff;
       border: 0;
+      border-radius: 1.6% / 2.5%;
       padding: 0;
       display: none;
       box-sizing: border-box;
+      overflow: hidden;
     }
     body.writing .write-pad { display: block; }
     .lesson-title {
@@ -213,7 +227,6 @@
     .pronunciation-link:focus-visible { outline: 3px solid #c4552a; outline-offset: 3px; }
     body.words .pronunciation-link { display: none !important; }
     body.words .kana-tabs, body.words .practice-navigation { display: none; }
-    body.words .script-tabs { margin-bottom: 10px; }
     .return-link { display: none; }
     body.words .return-link {
       display: flex; align-items: center; justify-content: center; gap: .35em;
@@ -424,12 +437,17 @@
     <h1>가나 학습 다시 보기</h1>
     <p>고등학교 공통 일본어 I 자료를 플래시 없이 브라우저에서 재생합니다. 소리가 있으면 화면 안 소리 버튼을 눌러 주세요.</p>
   </header>
-  <nav class="learning-nav" aria-label="학습 메뉴"><a href="/">かな소리</a><span id="learner"></span><a href="/results.html">나의 결과</a><button id="endSession" type="button">학습 종료</button></nav><main>
+  <nav class="learning-nav" aria-label="학습 메뉴">
+    <div class="nav-left">
+      <a class="nav-brand" href="/">かな소리</a>
+      <div class="script-tabs" id="scriptTabs" aria-label="학습 문자">
+        <button type="button" data-script="hiragana">히라가나</button>
+        <button type="button" data-script="katakana">가타카나</button>
+      </div>
+    </div>
+    <span id="learner"></span>
+  </nav><main>
     <div class="lesson-fit">
-    <nav class="script-tabs" id="scriptTabs" aria-label="학습 문자">
-      <button type="button" data-script="hiragana">히라가나</button>
-      <button type="button" data-script="katakana">가타카나</button>
-    </nav>
     <nav class="kana-tabs" id="kanaTabs" aria-label="가나 행"></nav>
     <div class="bar" id="lessons"></div>
     <div class="bar" id="sections"></div>
@@ -872,8 +890,9 @@
       document.getElementById('backToWriting').href = practiceUrl(file, { mode: false });
       document.getElementById('returnToWriting').href = practiceUrl(file, { mode: false });
       const next = ROWS[ROWS.indexOf(selectedRow) + 1];
-      document.getElementById('nextRow').href = next ? practiceUrl(next.file, { mode: false }) : '/results.html';
-      document.getElementById('nextRow').textContent = next ? `다음 ${next.kana}행 →` : '나의 결과 →';
+      document.getElementById('nextRow').href = next ? practiceUrl(next.file, { mode: false }) : practiceUrl(file, { mode: false });
+      document.getElementById('nextRow').textContent = next ? `다음 ${next.kana}행 →` : '마지막 행입니다';
+      document.getElementById('nextRow').hidden = !next;
       document.title = `${selectedRow?.kana || ''}행 ${wordMode ? '발음연습' : '획순·글자 연습'} · かな소리`;
       history.replaceState(null, "", historyUrl);
       setStatus(file + " 를 열고 있습니다.");

@@ -63,7 +63,9 @@ export function csvCell(value) {
 export function createApp({ db = openStore(resolve(process.env.DATA_DIR || 'data', 'kanasori.sqlite')), origin = process.env.APP_ORIGIN, secure = process.env.NODE_ENV === 'production', preview = false, studentClassId = process.env.STUDENT_CLASS_ID, sendMail } = {}) {
   const sheets = createSheetsSync(db,{url:process.env.SHEETS_WEB_APP_URL,token:process.env.SHEETS_SYNC_TOKEN,preview});
   const rates = new Map();
-  const schoolDay = () => new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+  const schoolDay = (value = Date.now()) => new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Seoul',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date(value));
+  const classEndedToday = endedAt => Number.isFinite(Number(endedAt)) && schoolDay(Number(endedAt)) === schoolDay();
+  const dayStartIso = () => new Date(`${schoolDay()}T00:00:00+09:00`).toISOString();
   const markAttendance = async (classId, number, status) => { await db.prepare('INSERT INTO attendance VALUES (?,?,?,?,?) ON CONFLICT(classId,number,day) DO UPDATE SET status=excluded.status,updated=excluded.updated').run(classId,number,schoolDay(),status,new Date().toISOString()); };
   function limit(key, max) {
     const now = Date.now();
@@ -114,7 +116,7 @@ export function createApp({ db = openStore(resolve(process.env.DATA_DIR || 'data
         if (!req.headers['content-type']?.startsWith('application/json')) throw failure(415, 'JSON 요청이 필요합니다.');
       }
       const teacherRequest = path === '/api/login' || path === '/api/export' || path.startsWith('/api/teacher/');
-      if (path.startsWith('/api/teacher/') && !['/api/teacher/me','/api/teacher/attempts','/api/teacher/logout','/api/teacher/attendance','/api/teacher/roster','/api/teacher/roster/delete','/api/teacher/sheets','/api/teacher/class-script'].includes(path)) throw failure(404, '찾을 수 없습니다.');
+      if (path.startsWith('/api/teacher/') && !['/api/teacher/me','/api/teacher/attempts','/api/teacher/logout','/api/teacher/attendance','/api/teacher/roster','/api/teacher/roster/delete','/api/teacher/sheets','/api/teacher/class-script','/api/teacher/end-class'].includes(path)) throw failure(404, '찾을 수 없습니다.');
       if (path.startsWith('/api/teacher/')) path = path.replace('/api/teacher/', '/api/');
       const cookieName = teacherRequest ? 'kanasori_teacher' : 'kanasori';
       const cookie = new RegExp(`(?:^|;\\s*)${cookieName}=([a-f0-9]{64})(?:;|$)`).exec(req.headers.cookie || '')?.[1];
@@ -239,8 +241,15 @@ export function createApp({ db = openStore(resolve(process.env.DATA_DIR || 'data
       }
       if (path === '/api/me' && req.method === 'GET') {
         auth(); const classes = session.role === 'teacher' ? await db.prepare('SELECT c.id,c.name FROM classes c JOIN permissions p ON p.classId=c.id WHERE p.teacher=?').all(session.owner) : [];
-        const classRow = session.classId ? await db.prepare('SELECT script FROM classes WHERE id=?').get(session.classId) : null;
-        return send(200, { role: session.role, name: session.name, number: session.number, classId: session.classId, script: normalizeScript(classRow?.script), classes, preview });
+        const classRow = session.classId ? await db.prepare('SELECT script, endedAt FROM classes WHERE id=?').get(session.classId) : null;
+        return send(200, { role: session.role, name: session.name, number: session.number, classId: session.classId, script: normalizeScript(classRow?.script), ended: classEndedToday(classRow?.endedAt), classes, preview });
+      }
+      if (path === '/api/ranking' && req.method === 'GET') {
+        auth('student');
+        const classRow = await db.prepare('SELECT endedAt FROM classes WHERE id=?').get(session.classId);
+        if (!classEndedToday(classRow?.endedAt)) throw failure(403, '학습이 종료된 뒤에 확인할 수 있습니다.');
+        const ranking = await db.prepare('SELECT number, name, COUNT(*) AS count FROM attempts WHERE classId=? AND at>=? GROUP BY number, name ORDER BY count DESC, number ASC LIMIT 10').all(session.classId, dayStartIso());
+        return send(200, { ranking: ranking.map((row, index) => ({ rank: index + 1, number: row.number, name: row.name, count: Number(row.count) || 0 })) });
       }
       if (path === '/api/class-script' && req.method === 'POST') {
         auth('teacher');
@@ -251,6 +260,14 @@ export function createApp({ db = openStore(resolve(process.env.DATA_DIR || 'data
         if (!await db.prepare('SELECT 1 FROM permissions WHERE teacher=? AND classId=?').get(session.owner, classId)) throw failure(403, '담당 학급만 확인할 수 있습니다.');
         await db.prepare('UPDATE classes SET script=? WHERE id=?').run(script, classId);
         return send(200, { ok: true, classId, script });
+      }
+      if (path === '/api/end-class' && req.method === 'POST') {
+        auth('teacher');
+        const data = await body();
+        const classId = text(data.classId, 80);
+        if (!await db.prepare('SELECT 1 FROM permissions WHERE teacher=? AND classId=?').get(session.owner, classId)) throw failure(403, '담당 학급만 종료할 수 있습니다.');
+        await db.prepare('UPDATE classes SET endedAt=? WHERE id=?').run(Date.now(), classId);
+        return send(200, { ok: true, classId, ended: true });
       }
       if (path === '/api/sheets' && req.method === 'GET') { auth('teacher'); return send(200, await sheets.status(session.owner)); }
       if (path === '/api/attendance' || path === '/api/roster' || path === '/api/roster/delete') {
@@ -338,8 +355,8 @@ export function createApp({ db = openStore(resolve(process.env.DATA_DIR || 'data
         }
         const day = schoolDay();
         const rows = await db.prepare("SELECT r.number,r.name,COALESCE(a.status,'absent') status FROM roster r LEFT JOIN attendance a ON a.classId=r.classId AND a.number=r.number AND a.day=? WHERE r.classId=? ORDER BY r.number").all(day,classId);
-        const classRow = await db.prepare('SELECT script FROM classes WHERE id=?').get(classId);
-        return send(200,{day,rows,total:rows.length,present:rows.filter(r=>r.status==='present').length,script:normalizeScript(classRow?.script)});
+        const classRow = await db.prepare('SELECT script, endedAt FROM classes WHERE id=?').get(classId);
+        return send(200,{day,rows,total:rows.length,present:rows.filter(r=>r.status==='present').length,script:normalizeScript(classRow?.script),ended:classEndedToday(classRow?.endedAt)});
       }
       if (path === '/api/reading' && req.method === 'POST') {
         auth('student'); limit(`reading:${session.owner}`, 40);
@@ -352,6 +369,8 @@ export function createApp({ db = openStore(resolve(process.env.DATA_DIR || 'data
       }
       if (path === '/api/attempts' && req.method === 'POST') {
         auth('student'); limit(`submit:${session.owner}`, 20);
+        const endedRow = await db.prepare('SELECT endedAt FROM classes WHERE id=?').get(session.classId);
+        if (classEndedToday(endedRow?.endedAt)) throw failure(403, '학습이 종료되어 더 이상 저장할 수 없습니다.');
         const data = await body(); const id = text(data.id, 80);
         if (!/^[a-f0-9-]{36}$/.test(id)) throw failure(400, '잘못된 기록 ID입니다.');
         const existing = await db.prepare('SELECT id,score,passed,heard FROM attempts WHERE id=? AND owner=?').get(id, session.owner);

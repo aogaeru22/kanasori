@@ -68,8 +68,13 @@ button,.button,.quiet,.small-button,.mark-present,.material-links a,.practice-na
 button:hover,.button:hover,.quiet:hover,.small-button:hover,.material-links a:hover,.practice-navigation a:hover { background:#f5f5dc18; border-color:var(--yellow); }
 .primary,button.primary { background:var(--yellow); color:#233e29; border:2px solid var(--yellow); font-weight:800; }
 .primary:hover { background:#f3db55; color:#233e29; }
-.topbar #logout,#logout.quiet,#endSession { color:#ffd9d2; background:#ff6b6b25; border-color:#ff6b6b88; }
-.topbar #logout:hover,#logout.quiet:hover,#endSession:hover { background:#ff6b6b40; }
+.topbar #logout,#logout.quiet,#endClass,.class-line .end-class { color:#ffd9d2; background:#ff6b6b25; border-color:#ff6b6b88; }
+.topbar #logout:hover,#logout.quiet:hover,#endClass:hover,.class-line .end-class:hover { background:#ff6b6b40; }
+.ended-banner { background:#ffd70022; border-color:#ffd70066; color:var(--chalk); }
+.ended-banner p,.ended-note { color:var(--muted); }
+.ranking-item { background:#1f3827; border-color:#f5f5dc40; color:var(--chalk); }
+.ranking-item.mine { border-color:var(--yellow); box-shadow:inset 0 0 0 1px #ffd70066; }
+.ranking-item .rank,.ranking-item .count { color:var(--yellow); }
 .topbar nav,.topbar nav a { color:var(--chalk); }
 .topbar nav a { color:var(--yellow); }
 dialog.teacher-auth { background:#233e29; color:var(--chalk); border:2px solid #f5f5dc70; }
@@ -138,7 +143,9 @@ tbody tr:hover { background:#f5f5dc07; }
 .chart-tooltip { background:var(--chalk); color:var(--board-dark); border:1px solid var(--yellow); }
 .up { color:var(--yellow); }
 .blue { background:var(--yellow); }.red { background:var(--red); }
-.learning-nav { padding-inline:18px; }
+.learning-nav { padding-inline:18px; justify-content:space-between; }
+.learning-nav .nav-brand { color:var(--yellow); }
+.learning-nav #learner { color:var(--chalk); }
 .row-tab { background:#f5f5dc09; color:var(--chalk); border-color:#f5f5dc70; border-radius:7px 11px 6px 8px; }
 .script-tabs button {
   color:var(--chalk);

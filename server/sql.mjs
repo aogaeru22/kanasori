@@ -1,4 +1,4 @@
-const IDENTIFIERS = ['classId', 'sentAt', 'className'];
+const IDENTIFIERS = ['classId', 'sentAt', 'className', 'endedAt'];
 
 // SQLite uses ? and unquoted camelCase. Postgres needs $1 and quoted identifiers.
 export function rewriteSql(sql) {
