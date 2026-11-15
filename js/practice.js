@@ -1,6 +1,6 @@
 import { api } from './api.js';
 import { assess } from './score.js';
-import { expandLongVowels, countMorae, promptedReading } from './kana.js?v=69';
+import { expandLongVowels, countMorae, promptedReading, katakanaScript, prefersKatakana } from './kana.js?v=71';
 import { PASS_THRESHOLD } from './lessons.js';
 import { createFeedbackVoice } from './feedback-voice.js';
 
@@ -78,7 +78,9 @@ export function setupPractice(getRow, { singleWord = false } = {}) {
   };
   const paint = (row, heard, result, saved) => {
     const firstPaint = paintedScore === null;
-    if ($('heardText')) $('heardText').textContent = heard;
+    const kata = prefersKatakana(row.reading);
+    const shownHeard = kata ? (result.score === 100 ? row.reading : katakanaScript(heard)) : heard;
+    if ($('heardText')) $('heardText').textContent = shownHeard;
     if ($('heardBox')) $('heardBox').hidden = false;
     if (paintedScore !== result.score) animateScore(result.score);
     paintedScore = result.score;
@@ -90,7 +92,21 @@ export function setupPractice(getRow, { singleWord = false } = {}) {
     $('verdictSub').textContent = `인식률 ${result.score}% · ${result.score === 100 ? nextPerfectPraise() : pass ? '잘했어요! 표시된 글자를 한 번 더 연습해 보세요.' : `${PASS_THRESHOLD}% 이상이 필요해요. 표시된 글자를 다시 발음해 보세요.`}`;
     $('diffLine').replaceChildren();
     const tag = document.createElement('span'); tag.className = 'tag'; tag.textContent = '목표:'; $('diffLine').append(tag);
-    for (const mark of assess(row.reading, heard, row.ruby || '').marks) { const span = document.createElement('span'); span.className = mark.kind === 'ok' ? 'ok' : 'bad'; span.textContent = mark.ch; $('diffLine').append(span); }
+    if (kata && result.score === 100) {
+      for (const ch of row.reading) {
+        const span = document.createElement('span');
+        span.className = 'ok';
+        span.textContent = ch;
+        $('diffLine').append(span);
+      }
+    } else {
+      for (const mark of assess(row.reading, heard, row.ruby || '').marks) {
+        const span = document.createElement('span');
+        span.className = mark.kind === 'ok' ? 'ok' : 'bad';
+        span.textContent = kata ? katakanaScript(mark.ch) : mark.ch;
+        $('diffLine').append(span);
+      }
+    }
     $('scoreResult').classList.add('show'); document.body.classList.add('scored');
     hint('다시 하려면 버튼을 누르세요.');
     if (firstPaint) scrollTo($('scoreResult'));
@@ -275,8 +291,8 @@ export function setupPractice(getRow, { singleWord = false } = {}) {
       const preview = accepted.replace(/[\s、。，．,.!！?？]/g,'');
       // Hangul such as 에 is the recognizer's spelling of the prompted kana.
       // Kanji stays hidden until the reading endpoint confirms it.
-      const kanaOnly = /^[ぁ-ゖ]+$/u.test(spoken) || (/[가-힣]/.test(spoken) && /^[ぁ-ゖ]+$/u.test(preview));
-      if ($('heardText')) $('heardText').textContent = kanaOnly ? preview : '';
+      const kanaOnly = /^[ぁ-ゖァ-ヶー]+$/u.test(spoken) || (/[가-힣]/.test(spoken) && /^[ぁ-ゖァ-ヶー]+$/u.test(preview));
+      if ($('heardText')) $('heardText').textContent = kanaOnly ? (prefersKatakana(target) ? katakanaScript(preview) : preview) : '';
       if ($('heardBox')) $('heardBox').hidden = !kanaOnly;
       const partial = accepted.length > 0 && accepted.length < target.length && target.startsWith(accepted);
       // The session may already have ended before a one-kana transcript arrives.

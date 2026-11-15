@@ -4,6 +4,15 @@ export function hiraganaScript(text) {
     ch => String.fromCharCode(ch.charCodeAt(0) - 0x60));
 }
 
+export function katakanaScript(text) {
+  return String(text || '').normalize('NFKC').replace(/[\u3041-\u3096]/g,
+    ch => String.fromCharCode(ch.charCodeAt(0) + 0x60));
+}
+
+export function prefersKatakana(text) {
+  return /[\u30a0-\u30ff]/.test(String(text || ''));
+}
+
 const VOWELS = [
   ['あ', 'あかがさざただなはばぱまやらわぁゃゎ'],
   ['い', 'いきぎしじちぢにひびぴみりゐぃ'],
