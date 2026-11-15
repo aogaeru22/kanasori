@@ -38,15 +38,14 @@ def patch(path: pathlib.Path) -> str:
     if not needed <= set(buttons):
         return f"missing {sorted(needed - set(buttons))}"
 
-    xs = []
     for name in COLOR_NAMES:
-        x, y, n = read_translate(raw, buttons[name.decode()])
-        xs.append(x)
+        _x, _y, n = read_translate(raw, buttons[name.decode()])
         hide = -(1 << (n - 1))
         write_translate_x(raw, buttons[name.decode()], hide)
 
     xc, yc, nc = read_translate(raw, buttons["clearBtn"])
-    center = (min(xs) + max(xs)) // 2
+    # Center of the writing-board toolbar (panel sits at ~545.5).
+    center = int(round(545.5 * 20))
     limit = 1 << (nc - 1)
     if not -limit <= center <= limit - 1:
         return f"clear x {center} does not fit in {nc} bits"

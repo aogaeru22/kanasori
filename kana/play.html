@@ -724,7 +724,7 @@
       player.style.touchAction = "none";
       stage.append(player);
       const source = wordMode ? selectedRow.voca : file;
-      const open = () => player.load(source + "?v=21-nocolor").then(() => {
+      const open = () => player.load(source + "?v=22-clear-center").then(() => {
         const pad = player.shadowRoot?.querySelector("canvas");
         if (pad) pad.style.touchAction = "none";
         const row = ROWS.find((item) => item.file === file);
